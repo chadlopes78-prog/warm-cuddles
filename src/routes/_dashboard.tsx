@@ -19,7 +19,8 @@ import {
   Target,
   Zap,
   AlertCircle,
-  Loader2
+  Loader2,
+  Receipt
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -236,6 +237,7 @@ function DashboardLayout() {
     { name: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { name: "Produtos", icon: Package, path: "/products" },
     { name: "Vendas", icon: CreditCard, path: "/sales" },
+    { name: "Transações", icon: Receipt, path: "/transactions" },
     { name: "Clientes", icon: Users, path: "/customers" },
     { 
       name: "Relatórios", 
