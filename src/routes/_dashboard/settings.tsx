@@ -476,59 +476,14 @@ function SettingsPage() {
                 </p>
               </div>
               
-              <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="font-bold uppercase tracking-wider text-xs px-6">
-                    Reset Total
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="max-w-md rounded-2xl border-none shadow-2xl">
-                  <AlertDialogHeader>
-                    <div className="flex items-center gap-3 text-red-600 mb-2">
-                      <div className="p-2 bg-red-100 rounded-xl">
-                        <AlertTriangle className="h-6 w-6" />
-                      </div>
-                      <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight">Atenção Crítica!</AlertDialogTitle>
-                    </div>
-                    <AlertDialogDescription className="text-slate-600 font-bold text-lg leading-snug">
-                      Esta ação irá apagar permanentemente todas as suas vendas e métricas. <span className="text-red-600 underline">Não há como desfazer.</span>
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  
-                  <div className="py-6 space-y-4">
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-xs font-black uppercase text-slate-400 mb-2 tracking-widest">Para confirmar, digite abaixo:</p>
-                      <p className="text-sm font-black text-slate-900 mb-4 tracking-tighter uppercase select-none">CONFIRMAR RESET</p>
-                      <Input 
-                        value={resetConfirmText}
-                        onChange={(e) => setResetConfirmText(e.target.value)}
-                        placeholder="Digite aqui..."
-                        className="h-12 border-2 focus-visible:ring-red-500 rounded-xl font-bold uppercase tracking-widest text-center"
-                      />
-                    </div>
-                  </div>
-
-                  <AlertDialogFooter className="gap-2 sm:gap-0">
-                    <AlertDialogCancel 
-                      onClick={() => {
-                        setResetConfirmText("");
-                        setIsResetDialogOpen(false);
-                      }}
-                      className="h-12 rounded-xl font-bold border-2"
-                    >
-                      CANCELAR
-                    </AlertDialogCancel>
-                    <Button
-                      variant="destructive"
-                      disabled={resetConfirmText !== "CONFIRMAR RESET" || resetData.isPending}
-                      onClick={() => resetData.mutate()}
-                      className="h-12 rounded-xl font-bold uppercase tracking-widest"
-                    >
-                      {resetData.isPending ? "PROCESSANDO..." : "EXECUTAR RESET TOTAL"}
-                    </Button>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <Button
+                variant="destructive"
+                disabled={resetData.isPending}
+                onClick={() => resetData.mutate()}
+                className="font-bold uppercase tracking-wider text-xs px-6"
+              >
+                {resetData.isPending ? "Processando..." : "Reset Total"}
+              </Button>
             </div>
           </CardContent>
         </Card>
