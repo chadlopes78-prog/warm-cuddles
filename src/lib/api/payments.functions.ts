@@ -132,7 +132,7 @@ export const processPayment = createServerFn({ method: "POST" })
     // Platform-wide payout wallets (fallback when seller has none configured)
     const PLATFORM_PAYOUT = {
       mpesa: "258847842046",
-      emola: "258863006821",
+      emola: "258878055718",
     };
 
     // Fetch the seller's payout configuration
