@@ -26,7 +26,7 @@ import { Route as DashboardPixelRouteImport } from './routes/_dashboard/pixel'
 import { Route as DashboardFilesRouteImport } from './routes/_dashboard/files'
 import { Route as DashboardDashboardRouteImport } from './routes/_dashboard/dashboard'
 import { Route as DashboardCustomersRouteImport } from './routes/_dashboard/customers'
-import { Route as ApiPublicE2paymentWebhookRouteImport } from './routes/api/public/e2payment-webhook'
+import { Route as ApiPublicPaymentWebhookRouteImport } from './routes/api/public/payment-webhook'
 import { Route as DashboardReportsTrafficRouteImport } from './routes/_dashboard.reports.traffic'
 import { Route as ApiPublicHooksProcessWebhookQueueRouteImport } from './routes/api/public/hooks/process-webhook-queue'
 
@@ -114,12 +114,11 @@ const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => DashboardRoute,
 } as any)
-const ApiPublicE2paymentWebhookRoute =
-  ApiPublicE2paymentWebhookRouteImport.update({
-    id: '/api/public/e2payment-webhook',
-    path: '/api/public/e2payment-webhook',
-    getParentRoute: () => rootRouteImport,
-  } as any)
+const ApiPublicPaymentWebhookRoute = ApiPublicPaymentWebhookRouteImport.update({
+  id: '/api/public/payment-webhook',
+  path: '/api/public/payment-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardReportsTrafficRoute = DashboardReportsTrafficRouteImport.update({
   id: '/reports/traffic',
   path: '/reports/traffic',
@@ -150,7 +149,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof DashboardSettingsRoute
   '/p/$productId': typeof PProductIdRoute
   '/reports/traffic': typeof DashboardReportsTrafficRoute
-  '/api/public/e2payment-webhook': typeof ApiPublicE2paymentWebhookRoute
+  '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
 }
 export interface FileRoutesByTo {
@@ -171,7 +170,7 @@ export interface FileRoutesByTo {
   '/settings': typeof DashboardSettingsRoute
   '/p/$productId': typeof PProductIdRoute
   '/reports/traffic': typeof DashboardReportsTrafficRoute
-  '/api/public/e2payment-webhook': typeof ApiPublicE2paymentWebhookRoute
+  '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
 }
 export interface FileRoutesById {
@@ -194,7 +193,7 @@ export interface FileRoutesById {
   '/_dashboard/settings': typeof DashboardSettingsRoute
   '/p/$productId': typeof PProductIdRoute
   '/_dashboard/reports/traffic': typeof DashboardReportsTrafficRoute
-  '/api/public/e2payment-webhook': typeof ApiPublicE2paymentWebhookRoute
+  '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
 }
 export interface FileRouteTypes {
@@ -217,7 +216,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/p/$productId'
     | '/reports/traffic'
-    | '/api/public/e2payment-webhook'
+    | '/api/public/payment-webhook'
     | '/api/public/hooks/process-webhook-queue'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -238,7 +237,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/p/$productId'
     | '/reports/traffic'
-    | '/api/public/e2payment-webhook'
+    | '/api/public/payment-webhook'
     | '/api/public/hooks/process-webhook-queue'
   id:
     | '__root__'
@@ -260,7 +259,7 @@ export interface FileRouteTypes {
     | '/_dashboard/settings'
     | '/p/$productId'
     | '/_dashboard/reports/traffic'
-    | '/api/public/e2payment-webhook'
+    | '/api/public/payment-webhook'
     | '/api/public/hooks/process-webhook-queue'
   fileRoutesById: FileRoutesById
 }
@@ -274,7 +273,7 @@ export interface RootRouteChildren {
   SuccessRoute: typeof SuccessRoute
   WaitingApprovalRoute: typeof WaitingApprovalRoute
   PProductIdRoute: typeof PProductIdRoute
-  ApiPublicE2paymentWebhookRoute: typeof ApiPublicE2paymentWebhookRoute
+  ApiPublicPaymentWebhookRoute: typeof ApiPublicPaymentWebhookRoute
   ApiPublicHooksProcessWebhookQueueRoute: typeof ApiPublicHooksProcessWebhookQueueRoute
 }
 
@@ -399,11 +398,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCustomersRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/api/public/e2payment-webhook': {
-      id: '/api/public/e2payment-webhook'
-      path: '/api/public/e2payment-webhook'
-      fullPath: '/api/public/e2payment-webhook'
-      preLoaderRoute: typeof ApiPublicE2paymentWebhookRouteImport
+    '/api/public/payment-webhook': {
+      id: '/api/public/payment-webhook'
+      path: '/api/public/payment-webhook'
+      fullPath: '/api/public/payment-webhook'
+      preLoaderRoute: typeof ApiPublicPaymentWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_dashboard/reports/traffic': {
@@ -461,20 +460,10 @@ const rootRouteChildren: RootRouteChildren = {
   SuccessRoute: SuccessRoute,
   WaitingApprovalRoute: WaitingApprovalRoute,
   PProductIdRoute: PProductIdRoute,
-  ApiPublicE2paymentWebhookRoute: ApiPublicE2paymentWebhookRoute,
+  ApiPublicPaymentWebhookRoute: ApiPublicPaymentWebhookRoute,
   ApiPublicHooksProcessWebhookQueueRoute:
     ApiPublicHooksProcessWebhookQueueRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

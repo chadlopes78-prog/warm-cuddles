@@ -1,8 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-const E2PAY_BASE_URL = "https://e2payments.explicador.co.mz";
-
 const PaymentInput = z.object({
   productId: z.string().min(1).max(120),
   method: z.enum(["mpesa", "emola"]),
@@ -78,53 +76,8 @@ function normalizeMozambicanPhone(value: string) {
   return digits;
 }
 
-let cachedToken: { value: string; expiresAt: number } | null = null;
-
-async function getAccessToken(): Promise<string> {
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 30_000) {
-    return cachedToken.value;
-  }
-
-  const clientId = process.env.E2PAYMENT_CLIENT_ID;
-  const clientSecret = process.env.E2PAYMENT_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error("Credenciais e2payment não configuradas no servidor.");
-  }
-
-  const res = await fetch(`${E2PAY_BASE_URL}/oauth/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "User-Agent": "Mozilla/5.0 (compatible; PaymentBlackmz/1.0)",
-    },
-    body: JSON.stringify({
-      grant_type: "client_credentials",
-      client_id: clientId,
-      client_secret: clientSecret,
-    }),
-  });
-
-  const text = await res.text();
-  let json: Record<string, unknown> | null = null;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    /* noop */
-  }
-
-  if (!res.ok || !json?.access_token) {
-    console.error("e2payment token error", { status: res.status, body: text?.slice(0, 500) });
-    throw new Error(`Falha ao autenticar com e2payment (HTTP ${res.status}).`);
-  }
-
-  const expiresInMs = (Number(json.expires_in) || 3600) * 1000;
-  cachedToken = {
-    value: String(json.access_token),
-    expiresAt: Date.now() + expiresInMs,
-  };
-  return cachedToken.value;
+function joinUrl(base: string, path: string) {
+  return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 }
 
 export const processPayment = createServerFn({ method: "POST" })
@@ -146,15 +99,17 @@ export const processPayment = createServerFn({ method: "POST" })
       return { success: false, error: "Para e-Mola use um número 86 ou 87." };
     }
 
-    const walletId =
+    const apiBaseUrl = process.env.PAYMENT_API_BASE_URL;
+    const apiKey = process.env.PAYMENT_API_KEY;
+    const methodEndpoint =
       data.method === "mpesa"
-        ? process.env.E2PAYMENT_WALLET_MPESA
-        : process.env.E2PAYMENT_WALLET_EMOLA;
+        ? process.env.PAYMENT_MPESA_ENDPOINT
+        : process.env.PAYMENT_EMOLA_ENDPOINT;
 
-    if (!walletId) {
+    if (!apiBaseUrl || !apiKey || !methodEndpoint) {
       return {
         success: false,
-        error: `Carteira ${data.method.toUpperCase()} não configurada no servidor.`,
+        error: "Gateway de pagamento não configurado no servidor.",
       };
     }
 
@@ -224,8 +179,9 @@ export const processPayment = createServerFn({ method: "POST" })
 
     // Eventos: venda criada + pagamento solicitado (fire-and-forget)
     {
-      const { enqueueWebhookEvent, processPendingForUser } =
-        await import("@/lib/webhooks/dispatcher.server");
+      const { enqueueWebhookEvent, processPendingForUser } = await import(
+        "@/lib/webhooks/dispatcher.server"
+      );
       const basePayload = {
         sale_id: sale.id,
         product_id: product.id,
@@ -253,8 +209,6 @@ export const processPayment = createServerFn({ method: "POST" })
       })().catch((e) => console.error("[webhooks] enqueue pre-payment err", e));
     }
 
-    const MERCHANT_NAME = "PagamentosMZ";
-    const PAYMENT_DESCRIPTION = "Pagamento de produto digital";
     const {
       confirmSalePayment,
       markSaleTerminalFailure,
@@ -263,37 +217,31 @@ export const processPayment = createServerFn({ method: "POST" })
       readGatewayTransactionId,
     } = await import("@/lib/payments/confirmation.server");
     const reference = paymentReferenceForSale(sale.id);
-    const localPhone = msisdn.slice(3); // 9-digit local format expected by e2payments
+    const localPhone = msisdn.slice(3);
 
     await supabaseAdmin.from("sales").update({ payment_reference: reference }).eq("id", sale.id);
 
     try {
-      const token = await getAccessToken();
-      const clientId = process.env.E2PAYMENT_CLIENT_ID!;
-
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 90_000);
 
-      const endpoint =
-        data.method === "mpesa"
-          ? `${E2PAY_BASE_URL}/v1/c2b/mpesa-payment/${walletId}`
-          : `${E2PAY_BASE_URL}/v1/c2b/emola-payment/${walletId}`;
+      const endpoint = joinUrl(apiBaseUrl, methodEndpoint);
 
       const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json; charset=utf-8",
           Accept: "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${apiKey}`,
           "User-Agent": "PagamentosMZ/1.0",
         },
         body: JSON.stringify({
-          client_id: clientId,
           amount: String(amount),
           phone: localPhone,
+          msisdn,
+          method: data.method,
           reference,
-          merchant_name: MERCHANT_NAME,
-          description: PAYMENT_DESCRIPTION,
+          description: "Pagamento de produto digital",
         }),
         signal: controller.signal,
       }).finally(() => clearTimeout(timeoutId));
@@ -306,7 +254,7 @@ export const processPayment = createServerFn({ method: "POST" })
         json = { raw: text };
       }
 
-      console.info("e2payment response", {
+      console.info("payment gateway response", {
         status: res.status,
         method: data.method,
         endpoint,

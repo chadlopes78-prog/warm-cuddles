@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute("/api/public/e2payment-webhook")({
+export const Route = createFileRoute("/api/public/payment-webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
@@ -13,11 +13,11 @@ export const Route = createFileRoute("/api/public/e2payment-webhook")({
         }
 
         // Optional shared-secret verification (header sent by e2payment)
-        const expectedSecret = process.env.E2PAYMENT_WEBHOOK_SECRET;
+        const expectedSecret = process.env.PAYMENT_WEBHOOK_SECRET;
         if (expectedSecret) {
           const sent =
             request.headers.get("x-webhook-secret") ||
-            request.headers.get("x-e2payment-secret") ||
+            request.headers.get("x-payment-secret") ||
             "";
           if (sent !== expectedSecret) {
             return new Response("Unauthorized", { status: 401 });
