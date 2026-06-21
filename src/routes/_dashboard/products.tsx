@@ -121,8 +121,7 @@ function ProductsPage() {
     if (!user) return;
 
     try {
-      const validSupportPhone = getValidSupportPhone();
-      if (!validSupportPhone) return;
+
 
       let deliveryFileUrl = "";
 
