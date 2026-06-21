@@ -339,42 +339,72 @@ function SettingsPage() {
               <CardTitle>Conta de Recebimento</CardTitle>
             </div>
             <CardDescription>
-              Para onde o valor líquido das suas vendas é enviado automaticamente.
+              Salve seus números M-Pesa e e-Mola. Os valores das vendas serão enviados para o número correspondente ao método escolhido pelo cliente.
               Taxa do gateway: 15% + 15 MZN por transação.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="payout-number">Número de Payout</Label>
-                <Input
-                  id="payout-number"
-                  value={payoutNumber}
-                  onChange={(e) => setPayoutNumber(e.target.value)}
-                  placeholder="84xxxxxxx"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="payout-method">Carteira</Label>
-                <select
-                  id="payout-method"
-                  value={payoutMethod}
-                  onChange={(e) =>
-                    setPayoutMethod(e.target.value as "mpesa_b2c" | "emola_b2c")
-                  }
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="mpesa_b2c">M-Pesa (84 / 85)</option>
-                  <option value="emola_b2c">e-Mola (86 / 87)</option>
-                </select>
-              </div>
+          <CardContent className="space-y-6">
+            {/* M-Pesa */}
+            <div className="space-y-2 p-4 rounded-xl border bg-slate-50/50">
+              <Label className="font-semibold">Número M-Pesa (84 / 85)</Label>
+              {savedMpesa && !editingMpesa ? (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm">
+                    Número de M-Pesa: <span className="font-bold">{formatSaved(savedMpesa)}</span> — salvo ✓
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => { setMpesaNumber(formatSaved(savedMpesa)); setEditingMpesa(true); }}>
+                    Editar
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    value={mpesaNumber}
+                    onChange={(e) => setMpesaNumber(e.target.value)}
+                    placeholder="84xxxxxxx ou 85xxxxxxx"
+                  />
+                  <Button onClick={() => updateMpesa.mutate()} disabled={updateMpesa.isPending}>
+                    {updateMpesa.isPending ? "Salvando..." : "Salvar"}
+                  </Button>
+                  {savedMpesa && (
+                    <Button variant="ghost" onClick={() => { setEditingMpesa(false); setMpesaNumber(""); }}>
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
-            <Button
-              onClick={() => updatePayout.mutate()}
-              disabled={updatePayout.isPending}
-            >
-              {updatePayout.isPending ? "Salvando..." : "Salvar Conta de Recebimento"}
-            </Button>
+
+            {/* e-Mola */}
+            <div className="space-y-2 p-4 rounded-xl border bg-slate-50/50">
+              <Label className="font-semibold">Número e-Mola (86 / 87)</Label>
+              {savedEmola && !editingEmola ? (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm">
+                    Número de e-Mola: <span className="font-bold">{formatSaved(savedEmola)}</span> — salvo ✓
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => { setEmolaNumber(formatSaved(savedEmola)); setEditingEmola(true); }}>
+                    Editar
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    value={emolaNumber}
+                    onChange={(e) => setEmolaNumber(e.target.value)}
+                    placeholder="86xxxxxxx ou 87xxxxxxx"
+                  />
+                  <Button onClick={() => updateEmola.mutate()} disabled={updateEmola.isPending}>
+                    {updateEmola.isPending ? "Salvando..." : "Salvar"}
+                  </Button>
+                  {savedEmola && (
+                    <Button variant="ghost" onClick={() => { setEditingEmola(false); setEmolaNumber(""); }}>
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
