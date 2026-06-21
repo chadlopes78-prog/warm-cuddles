@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ShieldX, LogOut, MessageSquare } from "lucide-react";
+import { isAdminEmail } from "@/lib/admins";
 
 export const Route = createFileRoute("/blocked")({
   component: BlockedPage,
@@ -14,7 +15,7 @@ function BlockedPage() {
   useEffect(() => {
     const checkBypass = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.email === "chadlopesff@gmail.com") {
+      if (isAdminEmail(session?.user?.email)) {
         navigate({ to: "/admin" });
       }
     };
