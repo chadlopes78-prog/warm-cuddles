@@ -16,6 +16,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { ShieldCheck, Loader2 } from "lucide-react";
+import { isAdminEmail } from "@/lib/admins";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -31,7 +32,7 @@ function AuthPage() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
-        if (session.user.email === "chadlopesff@gmail.com") {
+        if (isAdminEmail(session.user.email)) {
           navigate({ to: "/admin" });
         } else {
           // Check profile status
@@ -44,6 +45,8 @@ function AuthPage() {
           if (profile?.status === "banned" || profile?.status === "rejected") {
             await supabase.auth.signOut();
             navigate({ to: "/blocked" });
+          } else if (profile?.status === "pending" || !profile?.status) {
+            navigate({ to: "/waiting-approval" });
           } else {
             navigate({ to: "/dashboard" });
           }
@@ -104,7 +107,7 @@ function AuthPage() {
       
       clearTimeout(timeout);
       
-      if (data.user?.email === "chadlopesff@gmail.com") {
+      if (isAdminEmail(data.user?.email)) {
         setLoading(false);
         navigate({ to: "/admin" });
         return;
@@ -122,6 +125,11 @@ function AuthPage() {
       if (profile?.status === "banned" || profile?.status === "rejected") {
         await supabase.auth.signOut();
         navigate({ to: "/blocked" });
+        return;
+      }
+
+      if (profile?.status === "pending" || !profile?.status) {
+        navigate({ to: "/waiting-approval" });
         return;
       }
 

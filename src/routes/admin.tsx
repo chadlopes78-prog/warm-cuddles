@@ -44,6 +44,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { isAdminEmail } from "@/lib/admins";
 
 export const Route = createFileRoute("/admin")({
   component: AdminControlCenter,
@@ -64,7 +65,6 @@ function AdminControlCenter() {
   const navigate = useNavigate();
 
   const PAGE_SIZE = 20;
-  const ADMIN_EMAIL = "chadlopesff@gmail.com";
 
   useEffect(() => {
     checkAdmin();
@@ -82,8 +82,8 @@ function AdminControlCenter() {
         return;
       }
 
-      // Bypass for primary admin
-      if (session.user.email === ADMIN_EMAIL) {
+      // Bypass for primary admins
+      if (isAdminEmail(session.user.email)) {
         return;
       }
 

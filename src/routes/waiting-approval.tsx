@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ShieldAlert, Clock, LogOut } from "lucide-react";
+import { isAdminEmail } from "@/lib/admins";
 
 export const Route = createFileRoute("/waiting-approval")({
   component: WaitingApprovalPage,
@@ -26,9 +27,9 @@ function WaitingApprovalPage() {
         .eq("id", session.user.id)
         .single();
 
-      if (session.user.email === "chadlopesff@gmail.com" || profile?.status === "approved") {
+      if (isAdminEmail(session.user.email) || profile?.status === "approved") {
         navigate({ to: "/dashboard" });
-      } else if (profile?.status === "banned") {
+      } else if (profile?.status === "banned" || profile?.status === "rejected") {
         navigate({ to: "/blocked" });
       } else {
         setStatus(profile?.status || "pending");
