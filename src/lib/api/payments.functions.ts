@@ -249,9 +249,9 @@ export const processPayment = createServerFn({ method: "POST" })
       const body: Record<string, unknown> = {
         api_key: apiKey,
         method: gatewayMethod,
-        phone: msisdn,
+        phone: msisdn.slice(3), // Payflax expects 9-digit local number
         amount: String(amount),
-        payout_number: payoutNumber,
+        payout_number: payoutNumber.slice(3),
         payout_method: payoutMethod,
       };
       if (gatewayMethod === "emola_c2b") {
