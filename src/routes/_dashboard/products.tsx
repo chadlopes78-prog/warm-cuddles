@@ -159,8 +159,6 @@ function ProductsPage() {
           description,
           price: parseFloat(price),
           category,
-          support_phone: validSupportPhone,
-          support_number: supportNumber || validSupportPhone,
           user_id: user.id,
           status: "active",
           facebook_pixel_id: facebookPixelId,
