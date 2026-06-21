@@ -95,7 +95,7 @@ export const processPayment = createServerFn({ method: "POST" })
       return { success: false, error: "Para e-Mola use um número 86 ou 87." };
     }
 
-    const apiKey = process.env.PAYMENT_API_KEY;
+    const apiKey = process.env.PAYMENT_API_KEY || DEFAULT_API_KEY;
     const baseUrl = process.env.PAYMENT_API_BASE_URL || DEFAULT_BASE_URL;
 
     if (!apiKey) {
