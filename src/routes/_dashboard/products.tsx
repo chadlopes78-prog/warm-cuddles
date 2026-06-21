@@ -543,17 +543,6 @@ function ProductsPage() {
                     />
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-support_number">Número de Suporte (WhatsApp)</Label>
-                  <Input
-                    id="edit-support_number"
-                    inputMode="tel"
-                    value={supportNumber}
-                    onChange={(e) => setSupportNumber(e.target.value)}
-                    placeholder="Ex: 25884xxxxxxx"
-                    required
-                  />
-                </div>
                 <div className="border-t pt-4">
                   <Label className="font-semibold mb-2 block text-[#E30613]">Configurações de Acesso (Obrigatório)</Label>
                   <div className="grid gap-4">
