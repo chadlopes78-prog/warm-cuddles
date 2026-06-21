@@ -119,22 +119,14 @@ function AuthPage() {
 
       setLoading(false);
 
-      if (!profile) {
-        navigate({ to: "/waiting-approval" });
-        return;
-      }
-
-      if (profile.status === "banned" || profile.status === "rejected") {
+      if (profile?.status === "banned" || profile?.status === "rejected") {
         await supabase.auth.signOut();
         navigate({ to: "/blocked" });
         return;
       }
 
-      if (profile.status === "approved") {
-        navigate({ to: "/dashboard" });
-      } else {
-        navigate({ to: "/waiting-approval" });
-      }
+      navigate({ to: "/dashboard" });
+
     } catch (error: any) {
       clearTimeout(timeout);
       setLoading(false);
