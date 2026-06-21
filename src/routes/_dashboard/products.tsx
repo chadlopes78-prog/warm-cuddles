@@ -89,25 +89,6 @@ function ProductsPage() {
     return signed.signedUrl;
   };
 
-  const normalizeSupportPhone = (value: string) => {
-    let digits = (value || "").replace(/\D/g, "");
-    if (digits.startsWith("00")) digits = digits.slice(2);
-    if (digits.startsWith("258")) digits = digits.slice(3);
-    if (digits.startsWith("0")) digits = digits.slice(1);
-    if (digits.length === 9) return `258${digits}`;
-    return digits.startsWith("258") ? digits : `258${digits}`;
-  };
-
-  const getValidSupportPhone = () => {
-    const source = supportNumber || supportPhone;
-    const normalized = normalizeSupportPhone(source);
-    // Accepts any Mozambican mobile (Mcel/Vodacom/Movitel/Tmcel): 82-87 prefixes
-    if (!/^258(8[2-7])\d{7}$/.test(normalized)) {
-      toast.error("Informe um número de suporte válido (Movitel, Vodacom, Tmcel). Ex: 84xxxxxxx, 86xxxxxxx, 87xxxxxxx");
-      return null;
-    }
-    return normalized;
-  };
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -140,8 +121,7 @@ function ProductsPage() {
     if (!user) return;
 
     try {
-      const validSupportPhone = getValidSupportPhone();
-      if (!validSupportPhone) return;
+
 
       let deliveryFileUrl = "";
 
@@ -179,8 +159,6 @@ function ProductsPage() {
           description,
           price: parseFloat(price),
           category,
-          support_phone: validSupportPhone,
-          support_number: supportNumber || validSupportPhone,
           user_id: user.id,
           status: "active",
           facebook_pixel_id: facebookPixelId,
@@ -275,9 +253,6 @@ function ProductsPage() {
     if (!editingProduct) return;
 
     try {
-      const validSupportPhone = getValidSupportPhone();
-      if (!validSupportPhone) return;
-
       let finalImageUrl = imageUrl;
       if (imageFile) {
         finalImageUrl = await uploadProductImage(editingProduct.user_id, imageFile);
@@ -294,8 +269,6 @@ function ProductsPage() {
           description,
           price: parseFloat(price),
           category,
-          support_phone: validSupportPhone,
-          support_number: supportNumber || validSupportPhone,
           facebook_pixel_id: facebookPixelId,
           facebook_access_token: facebookAccessToken,
           delivery_type: deliveryType,
@@ -397,17 +370,6 @@ function ProductsPage() {
                     <Label htmlFor="category">Categoria</Label>
                     <Input id="category" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Educação" />
                   </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="support_number">Número de Suporte (WhatsApp)</Label>
-                  <Input
-                    id="support_number"
-                    inputMode="tel"
-                    value={supportNumber}
-                    onChange={(e) => setSupportNumber(e.target.value)}
-                    placeholder="Ex: 25884xxxxxxx"
-                    required
-                  />
                 </div>
                 <div className="border-t pt-4">
                   <Label className="font-semibold mb-2 block text-[#E30613]">Configurações de Acesso (Obrigatório)</Label>
@@ -542,17 +504,6 @@ function ProductsPage() {
                       placeholder="Educação"
                     />
                   </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="edit-support_number">Número de Suporte (WhatsApp)</Label>
-                  <Input
-                    id="edit-support_number"
-                    inputMode="tel"
-                    value={supportNumber}
-                    onChange={(e) => setSupportNumber(e.target.value)}
-                    placeholder="Ex: 25884xxxxxxx"
-                    required
-                  />
                 </div>
                 <div className="border-t pt-4">
                   <Label className="font-semibold mb-2 block text-[#E30613]">Configurações de Acesso (Obrigatório)</Label>
