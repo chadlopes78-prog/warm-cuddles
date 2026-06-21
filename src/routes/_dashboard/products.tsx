@@ -89,25 +89,6 @@ function ProductsPage() {
     return signed.signedUrl;
   };
 
-  const normalizeSupportPhone = (value: string) => {
-    let digits = (value || "").replace(/\D/g, "");
-    if (digits.startsWith("00")) digits = digits.slice(2);
-    if (digits.startsWith("258")) digits = digits.slice(3);
-    if (digits.startsWith("0")) digits = digits.slice(1);
-    if (digits.length === 9) return `258${digits}`;
-    return digits.startsWith("258") ? digits : `258${digits}`;
-  };
-
-  const getValidSupportPhone = () => {
-    const source = supportNumber || supportPhone;
-    const normalized = normalizeSupportPhone(source);
-    // Accepts any Mozambican mobile (Mcel/Vodacom/Movitel/Tmcel): 82-87 prefixes
-    if (!/^258(8[2-7])\d{7}$/.test(normalized)) {
-      toast.error("Informe um número de suporte válido (Movitel, Vodacom, Tmcel). Ex: 84xxxxxxx, 86xxxxxxx, 87xxxxxxx");
-      return null;
-    }
-    return normalized;
-  };
 
   const fetchProducts = async () => {
     setLoading(true);
