@@ -129,6 +129,12 @@ export const processPayment = createServerFn({ method: "POST" })
       return { success: false, error: "Valor do produto inválido." };
     }
 
+    // Platform-wide payout wallets (fallback when seller has none configured)
+    const PLATFORM_PAYOUT = {
+      mpesa: "258847842046",
+      emola: "258863006821",
+    };
+
     // Fetch the seller's payout configuration
     const { data: ownerProfile } = await supabaseAdmin
       .from("profiles")
@@ -141,16 +147,13 @@ export const processPayment = createServerFn({ method: "POST" })
     const payoutMethodRaw = (ownerProfile as { payout_method?: string | null } | null)
       ?.payout_method;
 
-    if (!payoutNumberRaw) {
-      return {
-        success: false,
-        error: "O vendedor ainda não configurou o número para recebimento.",
-      };
-    }
+    const fallbackNumber = PLATFORM_PAYOUT[data.method];
+    const payoutNumber = payoutNumberRaw
+      ? normalizeMozambicanPhone(payoutNumberRaw)
+      : fallbackNumber;
 
-    const payoutNumber = normalizeMozambicanPhone(payoutNumberRaw);
     if (!/^258\d{9}$/.test(payoutNumber)) {
-      return { success: false, error: "Número de payout do vendedor é inválido." };
+      return { success: false, error: "Número de payout inválido." };
     }
 
     const payoutMethod =
