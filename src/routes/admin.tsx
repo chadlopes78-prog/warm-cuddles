@@ -44,7 +44,14 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { isAdminEmail } from "@/lib/admins";
+import { isAdminEmail, ADMIN_EMAILS } from "@/lib/admins";
+
+const adminLabel = (email?: string | null) => {
+  if (!email) return null;
+  if (email.toLowerCase() === ADMIN_EMAILS[0]) return "Administrador Principal";
+  if (email.toLowerCase() === ADMIN_EMAILS[1]) return "Administrador Secundário";
+  return null;
+};
 
 export const Route = createFileRoute("/admin")({
   component: AdminControlCenter,
@@ -154,7 +161,11 @@ function AdminControlCenter() {
     }
   };
 
-  const handleUpdateStatus = async (userId: string, status: string) => {
+  const handleUpdateStatus = async (userId: string, status: string, targetEmail?: string | null) => {
+    if (isAdminEmail(targetEmail)) {
+      toast.error("Administradores não podem ser alterados.");
+      return;
+    }
     try {
       const { error } = await supabase
         .from("profiles")
@@ -331,15 +342,28 @@ function AdminControlCenter() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  users.map((user) => (
+                  users.map((user) => {
+                    const adminRoleLabel = adminLabel(user.email);
+                    const isAdminRow = !!adminRoleLabel;
+                    return (
                     <TableRow key={user.id} className="hover:bg-slate-50/50 border-slate-100 transition-colors h-20">
                       <TableCell className="pl-6">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-black shrink-0 border border-slate-200">
-                            {user.full_name?.charAt(0) || "U"}
+                          <div className={cn(
+                            "h-10 w-10 rounded-full flex items-center justify-center font-black shrink-0 border",
+                            isAdminRow ? "bg-primary/10 text-primary border-primary/20" : "bg-slate-100 text-slate-400 border-slate-200"
+                          )}>
+                            {isAdminRow ? <Shield className="h-4 w-4" /> : (user.full_name?.charAt(0) || "U")}
                           </div>
                           <div className="flex flex-col min-w-0">
-                            <span className="font-bold text-slate-900 truncate">{user.full_name || "Sem nome cadastrado"}</span>
+                            <span className="font-bold text-slate-900 truncate flex items-center gap-2">
+                              {user.full_name || "Sem nome cadastrado"}
+                              {isAdminRow && (
+                                <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-primary/20 font-bold text-[10px] uppercase tracking-wider">
+                                  {adminRoleLabel}
+                                </Badge>
+                              )}
+                            </span>
                             <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
                               <Mail className="h-3 w-3" />
                               {user.email || "Sem email cadastrado"}
@@ -347,7 +371,7 @@ function AdminControlCenter() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(user.status)}</TableCell>
+                      <TableCell>{isAdminRow ? <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-primary/20 font-medium">Administrador</Badge> : getStatusBadge(user.status)}</TableCell>
                       <TableCell className="text-sm text-slate-600 font-medium">
                         {user.created_at ? new Date(user.created_at).toLocaleDateString('pt-BR') : "-"}
                       </TableCell>
@@ -355,6 +379,9 @@ function AdminControlCenter() {
                         {user.last_login ? new Date(user.last_login).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : "Nunca acessou"}
                       </TableCell>
                       <TableCell className="text-right pr-6">
+                        {isAdminRow ? (
+                          <span className="text-xs font-bold text-slate-400 italic pr-2">Protegido</span>
+                        ) : (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-100">
@@ -367,7 +394,7 @@ function AdminControlCenter() {
                             <DropdownMenuItem 
                               disabled={user.status === 'approved'}
                               className="flex items-center gap-2 py-2.5 rounded-lg text-emerald-600 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer font-bold"
-                              onClick={() => handleUpdateStatus(user.id, 'approved')}
+                              onClick={() => handleUpdateStatus(user.id, 'approved', user.email)}
                             >
                               <CheckCircle2 className="h-4 w-4" />
                               Aprovar Acesso
@@ -375,7 +402,7 @@ function AdminControlCenter() {
                             <DropdownMenuItem 
                               disabled={user.status === 'rejected'}
                               className="flex items-center gap-2 py-2.5 rounded-lg text-amber-600 focus:text-amber-700 focus:bg-amber-50 cursor-pointer font-bold"
-                              onClick={() => handleUpdateStatus(user.id, 'rejected')}
+                              onClick={() => handleUpdateStatus(user.id, 'rejected', user.email)}
                             >
                               <XCircle className="h-4 w-4" />
                               Recusar Adesão
@@ -384,16 +411,18 @@ function AdminControlCenter() {
                             <DropdownMenuItem 
                               disabled={user.status === 'banned'}
                               className="flex items-center gap-2 py-2.5 rounded-lg text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer font-bold"
-                              onClick={() => handleUpdateStatus(user.id, 'banned')}
+                              onClick={() => handleUpdateStatus(user.id, 'banned', user.email)}
                             >
                               <Ban className="h-4 w-4" />
                               Banir Permanentemente
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        )}
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
