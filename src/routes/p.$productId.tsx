@@ -1,0 +1,405 @@
+import { createFileRoute, useParams } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useState, useEffect } from "react";
+import { processPayment, type PaymentResult } from "@/lib/api/payments.functions";
+import { getPublicProduct } from "@/lib/api/product-public.functions";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import {
+  ShieldCheck,
+  CheckCircle2,
+  Lock,
+  ShieldAlert,
+  Package,
+  Clock,
+  ArrowRight,
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import mozFlag from "@/assets/moz-flag.png.asset.json";
+
+export const Route = createFileRoute("/p/$productId")({
+  loader: async ({ params: { productId } }) => {
+    try {
+      return await getPublicProduct({ data: { productId } });
+    } catch (err) {
+      console.error("Loader error:", err);
+      return { product: null, checkout: null, defaultPixel: null };
+    }
+  },
+  head: ({ loaderData }) => {
+    const product = loaderData?.product;
+    if (!product) return {};
+    const image = product.image_url || "";
+    return {
+      meta: [
+        { title: `${product.name} | PagamentosMZ` },
+        { name: "description", content: product.description || "Checkout seguro via M-Pesa e e-Mola" },
+        { property: "og:title", content: product.name },
+        { property: "og:image", content: image },
+      ],
+      links: image
+        ? [{ rel: "preload", as: "image", href: image, fetchpriority: "high" }]
+        : [],
+    };
+  },
+  component: CheckoutPage,
+});
+
+declare global {
+  interface Window {
+    fbq: any;
+    _fbq: any;
+  }
+}
+
+function CheckoutPage() {
+  const payFn = useServerFn(processPayment);
+  const { productId } = useParams({ from: "/p/$productId" });
+  const { product, defaultPixel } = Route.useLoaderData();
+
+  const pixelId = product?.facebook_pixel_id || defaultPixel?.fb_pixel_id;
+
+  const [trafficPageId, setTrafficPageId] = useState<string | null>(null);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [paymentStatusMessage, setPaymentStatusMessage] = useState<string | null>(null);
+  const [paymentErrorMessage, setPaymentErrorMessage] = useState<string | null>(null);
+
+  const [name, setName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [phone, setPhone] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "emola">("mpesa");
+  const [timeLeft, setTimeLeft] = useState(600);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tp_id = params.get('tp_id');
+    if (tp_id) {
+      setTrafficPageId(tp_id);
+      supabase.functions.invoke('track-event', {
+        body: {
+          trackingId: tp_id,
+          eventType: 'click',
+          url: window.location.href,
+          referrer: document.referrer,
+          metadata: { productId }
+        }
+      }).catch((e) => console.error("Error recording click event:", e));
+    }
+  }, [productId]);
+
+  useEffect(() => {
+    if (!pixelId || !product) return;
+    try {
+      if (!window.fbq) {
+        const initFB = (f: any, b: any, e: any, v: any, n?: any, t?: any, s?: any) => {
+          if (f.fbq) return;
+          n = f.fbq = function () {
+            n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+          };
+          if (!f._fbq) f._fbq = n;
+          n.push = n; n.loaded = !0; n.version = '2.0'; n.queue = [];
+          t = b.createElement(e); t.async = !0; t.src = v;
+          s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s);
+        };
+        initFB(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+      }
+      window.fbq('init', pixelId);
+      window.fbq('track', 'PageView');
+      window.fbq('track', 'ViewContent', {
+        content_name: product.name,
+        content_category: product.category,
+        content_ids: [product.id],
+        content_type: 'product',
+        value: product.price,
+        currency: 'MZN'
+      });
+    } catch (e) {
+      console.error('FB Pixel error:', e);
+    }
+  }, [pixelId, product?.id]);
+
+  const trackEvent = (event: string) => {
+    try {
+      if (pixelId && window.fbq) {
+        window.fbq('track', event, {
+          content_name: product.name, value: product.price, currency: 'MZN',
+        });
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handlePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!phone || phone.replace(/\D/g, "").length < 9) {
+      toast.error("Por favor, insira um número de telefone válido.");
+      return;
+    }
+
+    setProcessingPayment(true);
+    setPaymentErrorMessage(null);
+    setPaymentStatusMessage(`Pedido enviado para ${paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola"}. Confirme no seu telefone.`);
+    trackEvent('InitiateCheckout');
+
+    try {
+      const result = (await payFn({
+        data: {
+          productId,
+          method: paymentMethod,
+          msisdn: phone,
+          customerName: name,
+          contactPhone: contactPhone || undefined,
+          trafficPageTrackingId: trafficPageId,
+        },
+      })) as PaymentResult;
+
+      if (!result.success) {
+        setPaymentErrorMessage(result.error || "Pagamento recusado.");
+        setPaymentStatusMessage(null);
+        toast.error(result.error || "Pagamento recusado.");
+        setProcessingPayment(false);
+        return;
+      }
+
+      trackEvent('Purchase');
+      setPaymentStatusMessage("Pagamento enviado. A redirecionar...");
+      window.location.href = `/payment-success?productId=${productId}&saleId=${result.saleId}`;
+    } catch (error: any) {
+      setPaymentErrorMessage(error?.message || "Erro inesperado ao processar pagamento.");
+      setPaymentStatusMessage(null);
+      toast.error("Erro ao processar pagamento: " + error.message);
+      setProcessingPayment(false);
+    }
+  };
+
+  if (!product) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <Card className="max-w-md w-full text-center p-8 shadow-xl border-none rounded-2xl">
+          <div className="h-16 w-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert className="h-8 w-8 text-red-500" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900">Produto Indisponível</h1>
+          <p className="text-slate-500 mt-3 text-sm">
+            O link pode ter expirado ou o produto foi removido.
+          </p>
+          <Button className="mt-6 w-full h-11 rounded-xl font-bold bg-slate-900 hover:bg-black" asChild>
+            <a href="/">Voltar ao início</a>
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  const accent = paymentMethod === "mpesa" ? "#E30613" : "#F97316";
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      <div className="mx-auto max-w-[440px] px-3 py-3 sm:py-5">
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-slate-200/60 overflow-hidden">
+          {/* Header: product + price */}
+          <div className="p-4 flex gap-3 items-center border-b border-slate-100">
+            <div className="h-14 w-14 bg-slate-100 rounded-xl overflow-hidden flex-shrink-0 ring-1 ring-slate-200/60">
+              {product.image_url ? (
+                <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" loading="eager" decoding="async" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-300">
+                  <Package className="h-6 w-6" />
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-sm font-semibold text-slate-900 leading-tight truncate">{product.name}</h1>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-2xl font-black text-slate-900 tracking-tight tabular-nums">
+                  {product.price.toLocaleString("pt-MZ")}
+                </span>
+                <span className="text-xs font-semibold text-slate-500">MT</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-0.5">
+              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase">
+                <Clock className="h-3 w-3" />
+                Expira em
+              </div>
+              <div className="text-sm font-black tabular-nums text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                {formatTime(timeLeft)}
+              </div>
+            </div>
+          </div>
+
+          {/* Optional banner */}
+          {product.checkout_banner_url && (
+            <div className="px-4 pt-3">
+              <img
+                src={product.checkout_banner_url}
+                alt="Oferta"
+                className="w-full h-auto rounded-xl object-cover border border-slate-100"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          )}
+
+          <form onSubmit={handlePayment} className="p-4 space-y-3">
+            {/* Buyer info */}
+            <div className="space-y-2">
+              <Input
+                placeholder="Nome completo"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-12 border-slate-200 rounded-xl bg-slate-50/50 text-sm font-medium placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:bg-white"
+              />
+
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="#25D366">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                  </svg>
+                  <span className="text-xs font-semibold text-slate-500">+258</span>
+                </div>
+                <Input
+                  placeholder="WhatsApp (84xxxxxxx)"
+                  inputMode="tel"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  className="h-12 pl-[72px] border-slate-200 rounded-xl bg-slate-50/50 text-sm font-medium placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:bg-white"
+                />
+              </div>
+            </div>
+
+            {/* Method selector */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => { setPaymentMethod("mpesa"); setPhone(""); }}
+                className={cn(
+                  "relative flex items-center gap-2 p-2.5 rounded-xl border-2 transition-all bg-white",
+                  paymentMethod === "mpesa"
+                    ? "border-[#E30613] shadow-[0_0_0_3px_rgba(227,6,19,0.08)]"
+                    : "border-slate-200 hover:border-slate-300",
+                )}
+              >
+                <div className="h-9 w-9 rounded-lg overflow-hidden flex-shrink-0">
+                  <img src="/mpesa-logo.jpg" className="h-full w-full object-cover" alt="M-Pesa" loading="lazy" />
+                </div>
+                <span className="text-sm font-bold text-slate-900">M-Pesa</span>
+                {paymentMethod === "mpesa" && (
+                  <CheckCircle2 className="absolute top-1.5 right-1.5 h-3.5 w-3.5 text-[#E30613] fill-white" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPaymentMethod("emola"); setPhone(""); }}
+                className={cn(
+                  "relative flex items-center gap-2 p-2.5 rounded-xl border-2 transition-all bg-white",
+                  paymentMethod === "emola"
+                    ? "border-orange-500 shadow-[0_0_0_3px_rgba(249,115,22,0.1)]"
+                    : "border-slate-200 hover:border-slate-300",
+                )}
+              >
+                <div className="h-9 w-9 rounded-lg overflow-hidden flex-shrink-0">
+                  <img src="/emola-logo.jpg" className="h-full w-full object-cover" alt="e-Mola" loading="lazy" />
+                </div>
+                <span className="text-sm font-bold text-slate-900">e-Mola</span>
+                {paymentMethod === "emola" && (
+                  <CheckCircle2 className="absolute top-1.5 right-1.5 h-3.5 w-3.5 text-orange-500 fill-white" />
+                )}
+              </button>
+            </div>
+
+            {/* Payment number */}
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
+                <img src={mozFlag.url} alt="MZ" className="h-3.5 w-5 object-cover rounded-sm" />
+                <span className="text-xs font-semibold text-slate-500">+258</span>
+              </div>
+              <Input
+                placeholder={paymentMethod === "mpesa" ? "Número M-Pesa (84/85)" : "Número e-Mola (86/87)"}
+                required
+                inputMode="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="h-12 pl-[72px] border-slate-200 rounded-xl bg-slate-50/50 text-sm font-medium placeholder:text-slate-400 focus-visible:ring-2 focus-visible:bg-white"
+                style={{ ['--tw-ring-color' as any]: accent }}
+              />
+            </div>
+
+            {/* Status / error */}
+            {(paymentStatusMessage || paymentErrorMessage) && (
+              <div
+                className={cn(
+                  "rounded-xl border p-3 text-xs font-medium",
+                  paymentErrorMessage
+                    ? "border-red-200 bg-red-50 text-red-700"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-700",
+                )}
+              >
+                {paymentErrorMessage || paymentStatusMessage}
+              </div>
+            )}
+
+            {/* CTA */}
+            <Button
+              type="submit"
+              disabled={processingPayment}
+              className="w-full h-14 text-base font-black text-white rounded-xl shadow-lg disabled:opacity-70 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-1"
+              style={{
+                background: `linear-gradient(180deg, ${accent} 0%, ${paymentMethod === "mpesa" ? "#B30410" : "#EA580C"} 100%)`,
+                boxShadow: `0 10px 25px -5px ${accent}50`,
+              }}
+            >
+              {processingPayment ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                <>
+                  <Lock className="h-4 w-4" />
+                  Pagar {product.price.toLocaleString("pt-MZ")} MT
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </Button>
+
+            {/* Trust strip */}
+            <div className="flex items-center justify-center gap-4 pt-2">
+              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <ShieldCheck className="h-3 w-3" />
+                Seguro
+              </div>
+              <div className="h-3 w-px bg-slate-200" />
+              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                <Lock className="h-3 w-3" />
+                Criptografado
+              </div>
+              <div className="h-3 w-px bg-slate-200" />
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                PagamentosMZ
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
