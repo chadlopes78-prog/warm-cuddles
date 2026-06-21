@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { subscribeToPushNotifications } from "@/lib/push-notifications";
+import { isAdminEmail } from "@/lib/admins";
 
 export const Route = createFileRoute("/_dashboard")({
   component: DashboardLayoutWrapper,
@@ -82,9 +83,12 @@ function DashboardLayout() {
 
   useEffect(() => {
     const checkStatus = (p: any) => {
-      // Apenas usuários banidos são bloqueados; aprovação não é mais necessária
       if (p?.status === "banned") {
         navigate({ to: "/blocked" });
+      } else if (p?.status === "rejected") {
+        navigate({ to: "/blocked" });
+      } else if (p?.status === "pending") {
+        navigate({ to: "/waiting-approval" });
       }
     };
 
@@ -101,7 +105,7 @@ function DashboardLayout() {
         }
 
         // ADMIN BYPASS TOTAL
-        if (session.user.email === 'chadlopesff@gmail.com') {
+        if (isAdminEmail(session.user.email)) {
           setUser(session.user);
           setProfile({ role: 'admin' });
           return;
@@ -117,13 +121,13 @@ function DashboardLayout() {
         if (error) throw error;
 
         if (!userProfile) {
-          // If profile doesn't exist, create it
+          // If profile doesn't exist, create it as pending (requires admin approval)
           const { data: newProfile, error: upsertError } = await supabase
             .from("profiles")
             .upsert({ 
               id: session.user.id,
               full_name: session.user.user_metadata?.full_name || '',
-              status: 'approved',
+              status: 'pending',
               role: 'user'
             })
             .select()
@@ -206,7 +210,7 @@ function DashboardLayout() {
         navigate({ to: "/auth" });
       } else {
         setUser(session.user);
-        if (session.user.email === 'chadlopesff@gmail.com') {
+        if (isAdminEmail(session.user.email)) {
           setProfile({ role: 'admin' });
         } else {
           const { data: p } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
@@ -246,7 +250,7 @@ function DashboardLayout() {
     },
     { name: "Pixel Facebook", icon: Target, path: "/pixel" },
     { name: "Assistente IA", icon: Zap, path: "/dashboard", params: { tab: 'ai' } },
-    ...(profile?.role === 'admin' || user?.email === 'chadlopesff@gmail.com' ? [{ name: "Painel Operacional", icon: ShieldCheck, path: "/admin" }] : []),
+    ...(profile?.role === 'admin' || isAdminEmail(user?.email) ? [{ name: "Painel Operacional", icon: ShieldCheck, path: "/admin" }] : []),
     { name: "Configurações", icon: Settings, path: "/settings" },
   ];
 
