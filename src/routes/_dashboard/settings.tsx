@@ -31,6 +31,8 @@ function SettingsPage() {
   const queryClient = useQueryClient();
   const [fullName, setFullName] = useState("");
   const [pushcutUrl, setPushcutUrl] = useState("");
+  const [payoutNumber, setPayoutNumber] = useState("");
+  const [payoutMethod, setPayoutMethod] = useState<"mpesa_b2c" | "emola_b2c">("mpesa_b2c");
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
 
@@ -56,7 +58,42 @@ function SettingsPage() {
     if (profile?.pushcut_url !== undefined && profile?.pushcut_url !== null) {
       setPushcutUrl(profile.pushcut_url);
     }
+    const p = profile as { payout_number?: string | null; payout_method?: string | null } | null;
+    if (p?.payout_number) setPayoutNumber(p.payout_number);
+    if (p?.payout_method === "emola_b2c" || p?.payout_method === "mpesa_b2c") {
+      setPayoutMethod(p.payout_method);
+    }
   }, [profile]);
+
+  const updatePayout = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Não autenticado");
+      const digits = payoutNumber.replace(/\D/g, "");
+      const normalized = digits.startsWith("258")
+        ? digits
+        : digits.length === 9
+          ? `258${digits}`
+          : digits;
+      if (!/^258\d{9}$/.test(normalized)) {
+        throw new Error("Número inválido. Use 9 dígitos (ex: 84xxxxxxx).");
+      }
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          payout_number: normalized,
+          payout_method: payoutMethod,
+          updated_at: new Date().toISOString(),
+        } as never)
+        .eq("id", user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Conta de recebimento atualizada!");
+    },
+    onError: (error: Error) => toast.error("Erro: " + error.message),
+  });
 
   const updatePushcut = useMutation({
     mutationFn: async (url: string) => {
@@ -273,6 +310,52 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <PieChart className="h-5 w-5 text-primary" />
+              <CardTitle>Conta de Recebimento</CardTitle>
+            </div>
+            <CardDescription>
+              Para onde o valor líquido das suas vendas é enviado automaticamente.
+              Taxa do gateway: 15% + 15 MZN por transação.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="payout-number">Número de Payout</Label>
+                <Input
+                  id="payout-number"
+                  value={payoutNumber}
+                  onChange={(e) => setPayoutNumber(e.target.value)}
+                  placeholder="84xxxxxxx"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="payout-method">Carteira</Label>
+                <select
+                  id="payout-method"
+                  value={payoutMethod}
+                  onChange={(e) =>
+                    setPayoutMethod(e.target.value as "mpesa_b2c" | "emola_b2c")
+                  }
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="mpesa_b2c">M-Pesa (84 / 85)</option>
+                  <option value="emola_b2c">e-Mola (86 / 87)</option>
+                </select>
+              </div>
+            </div>
+            <Button
+              onClick={() => updatePayout.mutate()}
+              disabled={updatePayout.isPending}
+            >
+              {updatePayout.isPending ? "Salvando..." : "Salvar Conta de Recebimento"}
+            </Button>
+          </CardContent>
+        </Card>
 
         <WebhooksSection />
 
