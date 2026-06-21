@@ -123,7 +123,7 @@ function DashboardLayout() {
             .upsert({ 
               id: session.user.id,
               full_name: session.user.user_metadata?.full_name || '',
-              status: 'pending',
+              status: 'approved',
               role: 'user'
             })
             .select()
