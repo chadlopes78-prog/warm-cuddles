@@ -16,6 +16,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { ShieldCheck, Loader2 } from "lucide-react";
+import { isAdminEmail } from "@/lib/admins";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
