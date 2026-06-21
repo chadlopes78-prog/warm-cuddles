@@ -19,7 +19,8 @@ import {
   Target,
   Zap,
   AlertCircle,
-  Loader2
+  Loader2,
+  Receipt
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
