@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+const DEFAULT_BASE_URL = "https://payflax.site";
+const PAY_PATH = "/api/pay";
+
 const PaymentInput = z.object({
   productId: z.string().min(1).max(120),
   method: z.enum(["mpesa", "emola"]),
@@ -15,16 +18,8 @@ const PaymentSuccessInput = z.object({
 });
 
 export type PaymentResult =
-  | {
-      success: true;
-      saleId: string;
-      transactionId: string | null;
-    }
-  | {
-      success: false;
-      error: string;
-      saleId?: string;
-    };
+  | { success: true; saleId: string; transactionId: string | null }
+  | { success: false; error: string; saleId?: string };
 
 export const getPaymentSuccessData = createServerFn({ method: "GET" })
   .inputValidator((input) => PaymentSuccessInput.parse(input))
@@ -99,18 +94,11 @@ export const processPayment = createServerFn({ method: "POST" })
       return { success: false, error: "Para e-Mola use um número 86 ou 87." };
     }
 
-    const apiBaseUrl = process.env.PAYMENT_API_BASE_URL;
     const apiKey = process.env.PAYMENT_API_KEY;
-    const methodEndpoint =
-      data.method === "mpesa"
-        ? process.env.PAYMENT_MPESA_ENDPOINT
-        : process.env.PAYMENT_EMOLA_ENDPOINT;
+    const baseUrl = process.env.PAYMENT_API_BASE_URL || DEFAULT_BASE_URL;
 
-    if (!apiBaseUrl || !apiKey || !methodEndpoint) {
-      return {
-        success: false,
-        error: "Gateway de pagamento não configurado no servidor.",
-      };
+    if (!apiKey) {
+      return { success: false, error: "Gateway de pagamento não configurado no servidor." };
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -121,12 +109,9 @@ export const processPayment = createServerFn({ method: "POST" })
       );
 
     let productQuery = supabaseAdmin.from("products").select("id, price, status, user_id");
-
-    if (isUuid) {
-      productQuery = productQuery.eq("id", data.productId);
-    } else {
-      productQuery = productQuery.eq("custom_url", data.productId);
-    }
+    productQuery = isUuid
+      ? productQuery.eq("id", data.productId)
+      : productQuery.eq("custom_url", data.productId);
 
     const { data: product, error: productError } = await productQuery.single();
 
@@ -142,6 +127,38 @@ export const processPayment = createServerFn({ method: "POST" })
     if (!Number.isFinite(amount) || amount <= 0 || amount > 500_000) {
       return { success: false, error: "Valor do produto inválido." };
     }
+
+    // Fetch the seller's payout configuration
+    const { data: ownerProfile } = await supabaseAdmin
+      .from("profiles")
+      // @ts-expect-error new columns not yet in generated types
+      .select("payout_number, payout_method")
+      .eq("id", product.user_id)
+      .maybeSingle();
+
+    const payoutNumberRaw = (ownerProfile as { payout_number?: string | null } | null)
+      ?.payout_number;
+    const payoutMethodRaw = (ownerProfile as { payout_method?: string | null } | null)
+      ?.payout_method;
+
+    if (!payoutNumberRaw) {
+      return {
+        success: false,
+        error: "O vendedor ainda não configurou o número para recebimento.",
+      };
+    }
+
+    const payoutNumber = normalizeMozambicanPhone(payoutNumberRaw);
+    if (!/^258\d{9}$/.test(payoutNumber)) {
+      return { success: false, error: "Número de payout do vendedor é inválido." };
+    }
+
+    const payoutMethod =
+      payoutMethodRaw === "emola_b2c" || payoutMethodRaw === "mpesa_b2c"
+        ? payoutMethodRaw
+        : data.method === "mpesa"
+          ? "mpesa_b2c"
+          : "emola_b2c";
 
     const customerName = data.contactPhone
       ? `${data.customerName.trim()} (contacto: ${data.contactPhone.trim()})`
@@ -177,7 +194,7 @@ export const processPayment = createServerFn({ method: "POST" })
       return { success: false, error: "Não foi possível registar a venda." };
     }
 
-    // Eventos: venda criada + pagamento solicitado (fire-and-forget)
+    // Webhook eventos pre-payment (fire-and-forget)
     {
       const { enqueueWebhookEvent, processPendingForUser } = await import(
         "@/lib/webhooks/dispatcher.server"
@@ -217,7 +234,7 @@ export const processPayment = createServerFn({ method: "POST" })
       readGatewayTransactionId,
     } = await import("@/lib/payments/confirmation.server");
     const reference = paymentReferenceForSale(sale.id);
-    const localPhone = msisdn.slice(3);
+    const gatewayMethod = data.method === "mpesa" ? "mpesa_c2b" : "emola_c2b";
 
     await supabaseAdmin.from("sales").update({ payment_reference: reference }).eq("id", sale.id);
 
@@ -225,24 +242,27 @@ export const processPayment = createServerFn({ method: "POST" })
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 90_000);
 
-      const endpoint = joinUrl(apiBaseUrl, methodEndpoint);
+      const endpoint = joinUrl(baseUrl, PAY_PATH);
+      const body: Record<string, unknown> = {
+        api_key: apiKey,
+        method: gatewayMethod,
+        phone: msisdn,
+        amount: String(amount),
+        payout_number: payoutNumber,
+        payout_method: payoutMethod,
+      };
+      if (gatewayMethod === "emola_c2b") {
+        body.name = customerName.slice(0, 60);
+      }
 
       const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json; charset=utf-8",
           Accept: "application/json",
-          Authorization: `Bearer ${apiKey}`,
           "User-Agent": "PagamentosMZ/1.0",
         },
-        body: JSON.stringify({
-          amount: String(amount),
-          phone: localPhone,
-          msisdn,
-          method: data.method,
-          reference,
-          description: "Pagamento de produto digital",
-        }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       }).finally(() => clearTimeout(timeoutId));
 
@@ -254,29 +274,47 @@ export const processPayment = createServerFn({ method: "POST" })
         json = { raw: text };
       }
 
-      console.info("payment gateway response", {
+      console.info("payflax response", {
         status: res.status,
-        method: data.method,
+        method: gatewayMethod,
         endpoint,
         reference,
         body: text?.slice(0, 800),
       });
 
-      const transactionId = readGatewayTransactionId(json);
-      const finalStatus = normalizeGatewayStatus(json, res.ok);
+      // Payflax wraps result under `transacao`
+      const txEnvelope =
+        json && typeof json === "object" && "transacao" in json
+          ? ((json as Record<string, unknown>).transacao as Record<string, unknown>)
+          : json;
+
+      const transactionId =
+        (txEnvelope && typeof txEnvelope === "object"
+          ? ((txEnvelope.id as string | undefined) ??
+            (txEnvelope.transaction_reference as string | undefined))
+          : null) ?? readGatewayTransactionId(json);
+
+      const finalStatus = normalizeGatewayStatus(txEnvelope ?? json, res.ok);
 
       if (finalStatus === "paid") {
-        await confirmSalePayment({ saleId: sale.id, transactionId, reference, rawPayload: json });
+        await confirmSalePayment({
+          saleId: sale.id,
+          transactionId: transactionId ? String(transactionId) : null,
+          reference,
+          rawPayload: json,
+        });
       } else if (finalStatus === "failed" || finalStatus === "expired") {
+        const messageSource =
+          (txEnvelope as Record<string, unknown> | null) ?? (json as Record<string, unknown>);
         const message =
-          json?.message ||
-          json?.error ||
-          json?.detail ||
+          messageSource?.message ||
+          messageSource?.error ||
+          messageSource?.detail ||
           (finalStatus === "expired" ? "Pagamento expirado." : "Pagamento recusado pelo gateway.");
         await markSaleTerminalFailure({
           saleId: sale.id,
           status: finalStatus,
-          transactionId,
+          transactionId: transactionId ? String(transactionId) : null,
           reference,
           reason: String(message),
         });
@@ -302,16 +340,9 @@ export const processPayment = createServerFn({ method: "POST" })
       console.error("processPayment error", err);
       await supabaseAdmin
         .from("sales")
-        .update({
-          status: "pending",
-          payment_reference: reference,
-        })
+        .update({ status: "pending", payment_reference: reference })
         .neq("status", "paid")
         .eq("id", sale.id);
-      return {
-        success: true,
-        saleId: sale.id,
-        transactionId: null,
-      };
+      return { success: true, saleId: sale.id, transactionId: null };
     }
   });
