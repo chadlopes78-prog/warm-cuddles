@@ -31,8 +31,10 @@ function SettingsPage() {
   const queryClient = useQueryClient();
   const [fullName, setFullName] = useState("");
   const [pushcutUrl, setPushcutUrl] = useState("");
-  const [payoutNumber, setPayoutNumber] = useState("");
-  const [payoutMethod, setPayoutMethod] = useState<"mpesa_b2c" | "emola_b2c">("mpesa_b2c");
+  const [mpesaNumber, setMpesaNumber] = useState("");
+  const [emolaNumber, setEmolaNumber] = useState("");
+  const [editingMpesa, setEditingMpesa] = useState(false);
+  const [editingEmola, setEditingEmola] = useState(false);
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
 
@@ -53,46 +55,65 @@ function SettingsPage() {
     }
   });
 
+  const savedMpesa = (profile as { payout_mpesa?: string | null } | null)?.payout_mpesa || "";
+  const savedEmola = (profile as { payout_emola?: string | null } | null)?.payout_emola || "";
+
   useEffect(() => {
     if (profile?.full_name) setFullName(profile.full_name);
     if (profile?.pushcut_url !== undefined && profile?.pushcut_url !== null) {
       setPushcutUrl(profile.pushcut_url);
     }
-    const p = profile as { payout_number?: string | null; payout_method?: string | null } | null;
-    if (p?.payout_number) setPayoutNumber(p.payout_number);
-    if (p?.payout_method === "emola_b2c" || p?.payout_method === "mpesa_b2c") {
-      setPayoutMethod(p.payout_method);
-    }
   }, [profile]);
 
-  const updatePayout = useMutation({
-    mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
-      const digits = payoutNumber.replace(/\D/g, "");
-      const normalized = digits.startsWith("258")
-        ? digits
-        : digits.length === 9
-          ? `258${digits}`
-          : digits;
-      if (!/^258\d{9}$/.test(normalized)) {
-        throw new Error("Número inválido. Use 9 dígitos (ex: 84xxxxxxx).");
-      }
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          payout_number: normalized,
-          payout_method: payoutMethod,
-          updated_at: new Date().toISOString(),
-        } as never)
-        .eq("id", user.id);
-      if (error) throw error;
-    },
+  const formatSaved = (v: string) => (v.startsWith("258") ? v.slice(3) : v);
+
+  const savePayout = async (kind: "mpesa" | "emola", raw: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado");
+    const digits = raw.replace(/\D/g, "");
+    const normalized = digits.startsWith("258")
+      ? digits
+      : digits.length === 9
+        ? `258${digits}`
+        : digits;
+    if (!/^258\d{9}$/.test(normalized)) {
+      throw new Error("Número inválido. Use 9 dígitos (ex: 84xxxxxxx).");
+    }
+    const prefix = normalized.slice(3, 5);
+    if (kind === "mpesa" && !["84", "85"].includes(prefix)) {
+      throw new Error("Número M-Pesa deve começar com 84 ou 85.");
+    }
+    if (kind === "emola" && !["86", "87"].includes(prefix)) {
+      throw new Error("Número e-Mola deve começar com 86 ou 87.");
+    }
+    const payload = kind === "mpesa" ? { payout_mpesa: normalized } : { payout_emola: normalized };
+    const { error } = await supabase
+      .from("profiles")
+      .update({ ...payload, updated_at: new Date().toISOString() } as never)
+      .eq("id", user.id);
+    if (error) throw error;
+  };
+
+  const updateMpesa = useMutation({
+    mutationFn: () => savePayout("mpesa", mpesaNumber),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
-      toast.success("Conta de recebimento atualizada!");
+      toast.success("Número M-Pesa salvo!");
+      setEditingMpesa(false);
+      setMpesaNumber("");
     },
-    onError: (error: Error) => toast.error("Erro: " + error.message),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const updateEmola = useMutation({
+    mutationFn: () => savePayout("emola", emolaNumber),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Número e-Mola salvo!");
+      setEditingEmola(false);
+      setEmolaNumber("");
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const updatePushcut = useMutation({
@@ -318,42 +339,72 @@ function SettingsPage() {
               <CardTitle>Conta de Recebimento</CardTitle>
             </div>
             <CardDescription>
-              Para onde o valor líquido das suas vendas é enviado automaticamente.
+              Salve seus números M-Pesa e e-Mola. Os valores das vendas serão enviados para o número correspondente ao método escolhido pelo cliente.
               Taxa do gateway: 15% + 15 MZN por transação.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="payout-number">Número de Payout</Label>
-                <Input
-                  id="payout-number"
-                  value={payoutNumber}
-                  onChange={(e) => setPayoutNumber(e.target.value)}
-                  placeholder="84xxxxxxx"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="payout-method">Carteira</Label>
-                <select
-                  id="payout-method"
-                  value={payoutMethod}
-                  onChange={(e) =>
-                    setPayoutMethod(e.target.value as "mpesa_b2c" | "emola_b2c")
-                  }
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="mpesa_b2c">M-Pesa (84 / 85)</option>
-                  <option value="emola_b2c">e-Mola (86 / 87)</option>
-                </select>
-              </div>
+          <CardContent className="space-y-6">
+            {/* M-Pesa */}
+            <div className="space-y-2 p-4 rounded-xl border bg-slate-50/50">
+              <Label className="font-semibold">Número M-Pesa (84 / 85)</Label>
+              {savedMpesa && !editingMpesa ? (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm">
+                    Número de M-Pesa: <span className="font-bold">{formatSaved(savedMpesa)}</span> — salvo ✓
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => { setMpesaNumber(formatSaved(savedMpesa)); setEditingMpesa(true); }}>
+                    Editar
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    value={mpesaNumber}
+                    onChange={(e) => setMpesaNumber(e.target.value)}
+                    placeholder="84xxxxxxx ou 85xxxxxxx"
+                  />
+                  <Button onClick={() => updateMpesa.mutate()} disabled={updateMpesa.isPending}>
+                    {updateMpesa.isPending ? "Salvando..." : "Salvar"}
+                  </Button>
+                  {savedMpesa && (
+                    <Button variant="ghost" onClick={() => { setEditingMpesa(false); setMpesaNumber(""); }}>
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
-            <Button
-              onClick={() => updatePayout.mutate()}
-              disabled={updatePayout.isPending}
-            >
-              {updatePayout.isPending ? "Salvando..." : "Salvar Conta de Recebimento"}
-            </Button>
+
+            {/* e-Mola */}
+            <div className="space-y-2 p-4 rounded-xl border bg-slate-50/50">
+              <Label className="font-semibold">Número e-Mola (86 / 87)</Label>
+              {savedEmola && !editingEmola ? (
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm">
+                    Número de e-Mola: <span className="font-bold">{formatSaved(savedEmola)}</span> — salvo ✓
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => { setEmolaNumber(formatSaved(savedEmola)); setEditingEmola(true); }}>
+                    Editar
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    value={emolaNumber}
+                    onChange={(e) => setEmolaNumber(e.target.value)}
+                    placeholder="86xxxxxxx ou 87xxxxxxx"
+                  />
+                  <Button onClick={() => updateEmola.mutate()} disabled={updateEmola.isPending}>
+                    {updateEmola.isPending ? "Salvando..." : "Salvar"}
+                  </Button>
+                  {savedEmola && (
+                    <Button variant="ghost" onClick={() => { setEditingEmola(false); setEmolaNumber(""); }}>
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
