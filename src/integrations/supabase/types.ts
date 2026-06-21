@@ -381,7 +381,9 @@ export type Database = {
           full_name: string | null
           id: string
           last_login: string | null
+          payout_emola: string | null
           payout_method: string | null
+          payout_mpesa: string | null
           payout_number: string | null
           pushcut_url: string | null
           role: string | null
@@ -395,7 +397,9 @@ export type Database = {
           full_name?: string | null
           id: string
           last_login?: string | null
+          payout_emola?: string | null
           payout_method?: string | null
+          payout_mpesa?: string | null
           payout_number?: string | null
           pushcut_url?: string | null
           role?: string | null
@@ -409,7 +413,9 @@ export type Database = {
           full_name?: string | null
           id?: string
           last_login?: string | null
+          payout_emola?: string | null
           payout_method?: string | null
+          payout_mpesa?: string | null
           payout_number?: string | null
           pushcut_url?: string | null
           role?: string | null
