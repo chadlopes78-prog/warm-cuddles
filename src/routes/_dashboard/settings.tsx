@@ -344,6 +344,30 @@ function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Resumo dos números salvos */}
+            <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50/60 p-4 space-y-2">
+              <p className="text-sm font-semibold text-emerald-900">📌 Números ativos de recebimento</p>
+              <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg bg-white p-3 border">
+                  <p className="text-xs text-muted-foreground">M-Pesa</p>
+                  {savedMpesa ? (
+                    <p className="font-bold text-base">{formatSaved(savedMpesa)} <span className="text-emerald-600 text-xs">✓ salvo</span></p>
+                  ) : (
+                    <p className="italic text-muted-foreground">Nenhum número salvo</p>
+                  )}
+                </div>
+                <div className="rounded-lg bg-white p-3 border">
+                  <p className="text-xs text-muted-foreground">e-Mola</p>
+                  {savedEmola ? (
+                    <p className="font-bold text-base">{formatSaved(savedEmola)} <span className="text-emerald-600 text-xs">✓ salvo</span></p>
+                  ) : (
+                    <p className="italic text-muted-foreground">Nenhum número salvo</p>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-emerald-800">Os pagamentos das vendas serão enviados para estes números.</p>
+            </div>
+
             {/* M-Pesa */}
             <div className="space-y-2 p-4 rounded-xl border bg-slate-50/50">
               <Label className="font-semibold">Número M-Pesa (84 / 85)</Label>
