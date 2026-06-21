@@ -94,7 +94,14 @@ function SettingsPage() {
       .select("id, payout_mpesa, payout_emola");
     if (error) throw error;
     if (!updated || updated.length === 0) {
-      throw new Error("Não foi possível salvar (permissão negada). Faça logout e entre novamente.");
+      const { data: inserted, error: insertError } = await supabase
+        .from("profiles")
+        .insert({ id: user.id, ...payload, updated_at: new Date().toISOString() } as never)
+        .select("id, payout_mpesa, payout_emola")
+        .single();
+
+      if (insertError) throw insertError;
+      if (!inserted) throw new Error("Não foi possível salvar o número. Faça logout e entre novamente.");
     }
   };
 
