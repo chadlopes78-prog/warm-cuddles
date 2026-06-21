@@ -311,6 +311,52 @@ function SettingsPage() {
         </Card>
 
 
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <PieChart className="h-5 w-5 text-primary" />
+              <CardTitle>Conta de Recebimento</CardTitle>
+            </div>
+            <CardDescription>
+              Para onde o valor líquido das suas vendas é enviado automaticamente.
+              Taxa do gateway: 15% + 15 MZN por transação.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="payout-number">Número de Payout</Label>
+                <Input
+                  id="payout-number"
+                  value={payoutNumber}
+                  onChange={(e) => setPayoutNumber(e.target.value)}
+                  placeholder="84xxxxxxx"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="payout-method">Carteira</Label>
+                <select
+                  id="payout-method"
+                  value={payoutMethod}
+                  onChange={(e) =>
+                    setPayoutMethod(e.target.value as "mpesa_b2c" | "emola_b2c")
+                  }
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="mpesa_b2c">M-Pesa (84 / 85)</option>
+                  <option value="emola_b2c">e-Mola (86 / 87)</option>
+                </select>
+              </div>
+            </div>
+            <Button
+              onClick={() => updatePayout.mutate()}
+              disabled={updatePayout.isPending}
+            >
+              {updatePayout.isPending ? "Salvando..." : "Salvar Conta de Recebimento"}
+            </Button>
+          </CardContent>
+        </Card>
+
         <WebhooksSection />
 
 
