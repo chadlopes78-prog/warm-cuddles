@@ -82,15 +82,12 @@ function DashboardLayout() {
 
   useEffect(() => {
     const checkStatus = (p: any) => {
-      // Se for o admin mestre, ignora status
-      if (user?.email === 'chadlopesff@gmail.com') return;
-      
-      if (p.status === "banned") {
+      // Apenas usuários banidos são bloqueados; aprovação não é mais necessária
+      if (p?.status === "banned") {
         navigate({ to: "/blocked" });
-      } else if (p.status !== "approved") {
-        navigate({ to: "/waiting-approval" });
       }
     };
+
 
     const checkAuth = async () => {
       try {
@@ -126,7 +123,7 @@ function DashboardLayout() {
             .upsert({ 
               id: session.user.id,
               full_name: session.user.user_metadata?.full_name || '',
-              status: 'pending',
+              status: 'approved',
               role: 'user'
             })
             .select()
