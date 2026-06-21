@@ -131,7 +131,6 @@ export const processPayment = createServerFn({ method: "POST" })
     // Fetch the seller's payout configuration
     const { data: ownerProfile } = await supabaseAdmin
       .from("profiles")
-      // @ts-expect-error new columns not yet in generated types
       .select("payout_number, payout_method")
       .eq("id", product.user_id)
       .maybeSingle();
