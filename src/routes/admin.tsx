@@ -65,7 +65,6 @@ function AdminControlCenter() {
   const navigate = useNavigate();
 
   const PAGE_SIZE = 20;
-  const ADMIN_EMAIL = "chadlopesff@gmail.com";
 
   useEffect(() => {
     checkAdmin();
@@ -83,8 +82,8 @@ function AdminControlCenter() {
         return;
       }
 
-      // Bypass for primary admin
-      if (session.user.email === ADMIN_EMAIL) {
+      // Bypass for primary admins
+      if (isAdminEmail(session.user.email)) {
         return;
       }
 
