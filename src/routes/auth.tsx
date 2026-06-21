@@ -66,7 +66,7 @@ function AuthPage() {
           data: {
             full_name: fullName,
           },
-          emailRedirectTo: window.location.origin + "/waiting-approval",
+          emailRedirectTo: window.location.origin + "/dashboard",
         },
       });
 
