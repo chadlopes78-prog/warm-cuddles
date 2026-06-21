@@ -44,7 +44,14 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { isAdminEmail } from "@/lib/admins";
+import { isAdminEmail, ADMIN_EMAILS } from "@/lib/admins";
+
+const adminLabel = (email?: string | null) => {
+  if (!email) return null;
+  if (email.toLowerCase() === ADMIN_EMAILS[0]) return "Administrador Principal";
+  if (email.toLowerCase() === ADMIN_EMAILS[1]) return "Administrador Secundário";
+  return null;
+};
 
 export const Route = createFileRoute("/admin")({
   component: AdminControlCenter,
@@ -154,7 +161,11 @@ function AdminControlCenter() {
     }
   };
 
-  const handleUpdateStatus = async (userId: string, status: string) => {
+  const handleUpdateStatus = async (userId: string, status: string, targetEmail?: string | null) => {
+    if (isAdminEmail(targetEmail)) {
+      toast.error("Administradores não podem ser alterados.");
+      return;
+    }
     try {
       const { error } = await supabase
         .from("profiles")
