@@ -237,6 +237,7 @@ function DashboardLayout() {
     { name: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { name: "Produtos", icon: Package, path: "/products" },
     { name: "Vendas", icon: CreditCard, path: "/sales" },
+    { name: "Transações", icon: Receipt, path: "/transactions" },
     { name: "Clientes", icon: Users, path: "/customers" },
     { 
       name: "Relatórios", 
