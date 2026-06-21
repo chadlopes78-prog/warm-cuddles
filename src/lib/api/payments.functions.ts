@@ -135,33 +135,38 @@ export const processPayment = createServerFn({ method: "POST" })
       emola: "258863006821",
     };
 
-    // Fetch the seller's payout configuration
+    // Fetch the seller's payout configuration (per-method)
     const { data: ownerProfile } = await supabaseAdmin
       .from("profiles")
-      .select("payout_number, payout_method")
+      .select("payout_number, payout_method, payout_mpesa, payout_emola")
       .eq("id", product.user_id)
       .maybeSingle();
 
-    const payoutNumberRaw = (ownerProfile as { payout_number?: string | null } | null)
-      ?.payout_number;
-    const payoutMethodRaw = (ownerProfile as { payout_method?: string | null } | null)
-      ?.payout_method;
+    const op = ownerProfile as {
+      payout_number?: string | null;
+      payout_method?: string | null;
+      payout_mpesa?: string | null;
+      payout_emola?: string | null;
+    } | null;
+
+    // Select payout number based on customer's chosen method
+    const methodSpecific = data.method === "mpesa" ? op?.payout_mpesa : op?.payout_emola;
+    // Fallback to legacy single field if it matches the method
+    const legacyMatches =
+      (data.method === "mpesa" && op?.payout_method === "mpesa_b2c") ||
+      (data.method === "emola" && op?.payout_method === "emola_b2c");
+    const payoutSource = methodSpecific || (legacyMatches ? op?.payout_number : null);
 
     const fallbackNumber = PLATFORM_PAYOUT[data.method];
-    const payoutNumber = payoutNumberRaw
-      ? normalizeMozambicanPhone(payoutNumberRaw)
+    const payoutNumber = payoutSource
+      ? normalizeMozambicanPhone(payoutSource)
       : fallbackNumber;
 
     if (!/^258\d{9}$/.test(payoutNumber)) {
       return { success: false, error: "Número de payout inválido." };
     }
 
-    const payoutMethod =
-      payoutMethodRaw === "emola_b2c" || payoutMethodRaw === "mpesa_b2c"
-        ? payoutMethodRaw
-        : data.method === "mpesa"
-          ? "mpesa_b2c"
-          : "emola_b2c";
+    const payoutMethod = data.method === "mpesa" ? "mpesa_b2c" : "emola_b2c";
 
     const customerName = data.contactPhone
       ? `${data.customerName.trim()} (contacto: ${data.contactPhone.trim()})`
