@@ -87,11 +87,15 @@ function SettingsPage() {
       throw new Error("Número e-Mola deve começar com 86 ou 87.");
     }
     const payload = kind === "mpesa" ? { payout_mpesa: normalized } : { payout_emola: normalized };
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from("profiles")
       .update({ ...payload, updated_at: new Date().toISOString() } as never)
-      .eq("id", user.id);
+      .eq("id", user.id)
+      .select("id, payout_mpesa, payout_emola");
     if (error) throw error;
+    if (!updated || updated.length === 0) {
+      throw new Error("Não foi possível salvar (permissão negada). Faça logout e entre novamente.");
+    }
   };
 
   const updateMpesa = useMutation({
