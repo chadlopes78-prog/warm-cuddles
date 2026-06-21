@@ -263,7 +263,10 @@ function DashboardPage() {
     const { stats } = dashboardData;
     const total = Number(stats.total_transactions) || 0;
     const success = Number(stats.success_count) || 0;
-    const received = Number(stats.received_value) || 0;
+    const receivedGross = Number(stats.received_value) || 0;
+    // Gateway fee: 15% + 15 MZN per approved transaction
+    const gatewayFee = receivedGross * 0.15 + success * 15;
+    const received = Math.max(0, receivedGross - gatewayFee);
     const conversionRate = total > 0 ? (success / total) * 100 : 0;
     const avgTicket = success > 0 ? received / success : 0;
 
@@ -272,9 +275,9 @@ function DashboardPage() {
 
     const heroKpis = [
       {
-        title: "Valor Recebido",
+        title: "Valor Recebido (líquido)",
         value: fmtMT(received),
-        description: "Dinheiro real em caixa",
+        description: `Bruto ${fmtMT(receivedGross)} − taxa ${fmtMT(gatewayFee)}`,
         icon: CreditCard,
         accent: "bg-emerald-500",
         tone: "text-emerald-600",
@@ -288,9 +291,9 @@ function DashboardPage() {
         tone: "text-blue-600",
       },
       {
-        title: "Ticket Médio",
+        title: "Ticket Médio (líquido)",
         value: fmtMT(avgTicket),
-        description: "Por venda aprovada",
+        description: "Por venda aprovada, após taxa",
         icon: DollarSign,
         accent: "bg-slate-900",
         tone: "text-slate-900",
