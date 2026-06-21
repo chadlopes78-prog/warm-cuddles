@@ -253,9 +253,6 @@ function ProductsPage() {
     if (!editingProduct) return;
 
     try {
-      const validSupportPhone = getValidSupportPhone();
-      if (!validSupportPhone) return;
-
       let finalImageUrl = imageUrl;
       if (imageFile) {
         finalImageUrl = await uploadProductImage(editingProduct.user_id, imageFile);
@@ -272,8 +269,6 @@ function ProductsPage() {
           description,
           price: parseFloat(price),
           category,
-          support_phone: validSupportPhone,
-          support_number: supportNumber || validSupportPhone,
           facebook_pixel_id: facebookPixelId,
           facebook_access_token: facebookAccessToken,
           delivery_type: deliveryType,
