@@ -145,13 +145,30 @@ function TransactionsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Receipt className="h-7 w-7" /> Histórico de Transações
-        </h1>
-        <p className="text-muted-foreground">
-          Dados em tempo real. Acompanhe todos os pagamentos processados (M-Pesa e e-Mola).
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Receipt className="h-7 w-7" /> Histórico de Transações
+          </h1>
+          <p className="text-muted-foreground">
+            Dados em tempo real. Acompanhe todos os pagamentos processados (M-Pesa e e-Mola).
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={async () => {
+            const { data, error } = await supabase.rpc("clean_invalid_sales");
+            if (error) {
+              toast.error(error.message);
+              return;
+            }
+            const deleted = (data as { deleted?: number } | null)?.deleted ?? 0;
+            toast.success(`${deleted} registo(s) inválido(s) removido(s)`);
+            queryClient.invalidateQueries({ queryKey: ["transactions"] });
+          }}
+        >
+          🧹 Limpar Registros Inválidos
+        </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
