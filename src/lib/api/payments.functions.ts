@@ -110,7 +110,9 @@ export const processPayment = createServerFn({ method: "POST" })
         data.productId,
       );
 
-    let productQuery = supabaseAdmin.from("products").select("id, price, status, user_id");
+    let productQuery = supabaseAdmin
+      .from("products")
+      .select("id, price, status, user_id, bump_enabled, bump_price");
     productQuery = isUuid
       ? productQuery.eq("id", data.productId)
       : productQuery.eq("custom_url", data.productId);
@@ -125,7 +127,12 @@ export const processPayment = createServerFn({ method: "POST" })
       return { success: false, error: "Produto indisponível para compra." };
     }
 
-    const amount = Number(product.price);
+    const baseAmount = Number(product.price);
+    const bumpEligible = Boolean(
+      data.bumpAccepted && product.bump_enabled && product.bump_price && Number(product.bump_price) > 0,
+    );
+    const bumpAmount = bumpEligible ? Number(product.bump_price) : 0;
+    const amount = baseAmount + bumpAmount;
     if (!Number.isFinite(amount) || amount <= 0 || amount > 500_000) {
       return { success: false, error: "Valor do produto inválido." };
     }
