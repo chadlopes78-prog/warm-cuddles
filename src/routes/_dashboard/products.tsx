@@ -273,6 +273,14 @@ function ProductsPage() {
     setImageFile(null);
     setBannerUrl(product.checkout_banner_url || "");
     setBannerFile(null);
+    setBumpEnabled(!!product.bump_enabled);
+    setBumpTitle(product.bump_title || "");
+    setBumpDescription(product.bump_description || "");
+    setBumpPrice(product.bump_price != null ? String(product.bump_price) : "");
+    setBumpButtonText(product.bump_button_text || "Sim, quero adicionar!");
+    setBumpHighlightColor(product.bump_highlight_color || "#16a34a");
+    setBumpImageUrl(product.bump_image_url || "");
+    setBumpImageFile(null);
     setIsEditDialogOpen(true);
   };
 
