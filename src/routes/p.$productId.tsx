@@ -446,6 +446,25 @@ function CheckoutPage() {
               </button>
             )}
 
+            {/* Total a pagar (dinâmico) */}
+            {(() => {
+              const total =
+                Number(product.price) +
+                (bumpAccepted && product.bump_enabled && product.bump_price
+                  ? Number(product.bump_price)
+                  : 0);
+              return (
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Total a pagar
+                  </span>
+                  <span className="text-lg font-black tabular-nums text-slate-900">
+                    {total.toLocaleString("pt-MZ")} MT
+                  </span>
+                </div>
+              );
+            })()}
+
             {/* CTA */}
             <Button
               type="submit"
@@ -464,7 +483,7 @@ function CheckoutPage() {
               ) : (
                 <>
                   <Lock className="h-4 w-4" />
-                  Pagar {product.price.toLocaleString("pt-MZ")} MT
+                  Pagar {(Number(product.price) + (bumpAccepted && product.bump_enabled && product.bump_price ? Number(product.bump_price) : 0)).toLocaleString("pt-MZ")} MT
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
