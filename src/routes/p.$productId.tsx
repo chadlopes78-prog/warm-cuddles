@@ -392,6 +392,60 @@ function CheckoutPage() {
               </div>
             )}
 
+            {/* Order Bump */}
+            {product.bump_enabled && product.bump_price && Number(product.bump_price) > 0 && (
+              <button
+                type="button"
+                onClick={() => setBumpAccepted((v) => !v)}
+                className={cn(
+                  "w-full text-left rounded-xl border-2 border-dashed p-3 transition-all flex gap-3 items-center",
+                  bumpAccepted ? "bg-white shadow-md" : "bg-white/60 hover:bg-white",
+                )}
+                style={{
+                  borderColor: product.bump_highlight_color || "#16a34a",
+                }}
+              >
+                <div
+                  className={cn(
+                    "h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0",
+                  )}
+                  style={{
+                    borderColor: product.bump_highlight_color || "#16a34a",
+                    background: bumpAccepted ? (product.bump_highlight_color || "#16a34a") : "transparent",
+                  }}
+                >
+                  {bumpAccepted && <CheckCircle2 className="h-4 w-4 text-white" />}
+                </div>
+                {product.bump_image_url && (
+                  <img
+                    src={product.bump_image_url}
+                    alt=""
+                    className="h-12 w-12 rounded-lg object-cover flex-shrink-0"
+                    loading="lazy"
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div
+                    className="text-[10px] font-black uppercase tracking-wide"
+                    style={{ color: product.bump_highlight_color || "#16a34a" }}
+                  >
+                    {product.bump_button_text || "Oferta especial"}
+                  </div>
+                  <div className="text-sm font-bold text-slate-900 leading-tight truncate">
+                    {product.bump_title || "Adicionar oferta"}
+                  </div>
+                  {product.bump_description && (
+                    <div className="text-[11px] text-slate-500 leading-snug line-clamp-2">
+                      {product.bump_description}
+                    </div>
+                  )}
+                  <div className="mt-0.5 text-xs font-black text-slate-900 tabular-nums">
+                    + {Number(product.bump_price).toLocaleString("pt-MZ")} MT
+                  </div>
+                </div>
+              </button>
+            )}
+
             {/* CTA */}
             <Button
               type="submit"
