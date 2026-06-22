@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Receipt, Search, ArrowDownCircle, ArrowUpCircle, Wallet } from "lucide-react";
+import { Receipt, Search, ArrowDownCircle, ArrowUpCircle, Wallet, CheckCircle2, XCircle, TrendingUp, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -110,16 +110,34 @@ function TransactionsPage() {
   }, [sales, search, methodFilter, statusFilter]);
 
   const totals = useMemo(() => {
-    const t = { sent: 0, received: 0, pending: 0, count: filtered.length };
+    const t = {
+      sent: 0,
+      received: 0,
+      pending: 0,
+      count: filtered.length,
+      approvedCount: 0,
+      pendingCount: 0,
+      failedCount: 0,
+    };
     for (const s of filtered) {
       const amount = Number(s.amount) || 0;
       const st = (s.status || "").toLowerCase();
       t.sent += amount;
-      if (SUCCESS_STATUSES.includes(st)) t.received += amount;
-      else if (st === "pending") t.pending += amount;
+      if (SUCCESS_STATUSES.includes(st)) {
+        t.received += amount;
+        t.approvedCount += 1;
+      } else if (st === "pending") {
+        t.pending += amount;
+        t.pendingCount += 1;
+      } else if (FAILED_STATUSES.includes(st)) {
+        t.failedCount += 1;
+      }
     }
     return t;
   }, [filtered]);
+
+  const conversionRate = totals.count > 0 ? (totals.approvedCount / totals.count) * 100 : 0;
+  const averageTicket = totals.approvedCount > 0 ? totals.received / totals.approvedCount : 0;
 
   const fmt = (n: number) => `${n.toLocaleString("pt-MZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MT`;
 
@@ -130,14 +148,24 @@ function TransactionsPage() {
           <Receipt className="h-7 w-7" /> Histórico de Transações
         </h1>
         <p className="text-muted-foreground">
-          Acompanhe todos os pagamentos processados (M-Pesa e e-Mola) com status, método e valores.
+          Dados em tempo real. Acompanhe todos os pagamentos processados (M-Pesa e e-Mola).
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Enviado</CardTitle>
+            <CardTitle className="text-sm font-medium">Receita (aprovado)</CardTitle>
+            <ArrowDownCircle className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{fmt(totals.received)}</div>
+            <p className="text-xs text-muted-foreground">{totals.approvedCount} aprovadas</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Total Processado</CardTitle>
             <ArrowUpCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -147,23 +175,57 @@ function TransactionsPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Recebido (aprovado)</CardTitle>
-            <ArrowDownCircle className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium">Taxa de Conversão</CardTitle>
+            <Target className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{fmt(totals.received)}</div>
+            <div className="text-2xl font-bold text-blue-600">{conversionRate.toFixed(1)}%</div>
+            <p className="text-xs text-muted-foreground">Aprovadas / Total</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Pendente</CardTitle>
-            <Wallet className="h-4 w-4 text-yellow-600" />
+            <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
+            <TrendingUp className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{fmt(totals.pending)}</div>
+            <div className="text-2xl font-bold text-purple-600">{fmt(averageTicket)}</div>
+            <p className="text-xs text-muted-foreground">Por venda aprovada</p>
           </CardContent>
         </Card>
       </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Aprovadas</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold text-green-600">{totals.approvedCount}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
+            <Wallet className="h-4 w-4 text-yellow-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold text-yellow-600">{totals.pendingCount}</div>
+            <p className="text-xs text-muted-foreground">{fmt(totals.pending)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Falhas</CardTitle>
+            <XCircle className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold text-red-600">{totals.failedCount}</div>
+          </CardContent>
+        </Card>
+      </div>
+
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <div className="relative flex-1 max-w-sm">
