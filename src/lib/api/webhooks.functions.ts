@@ -90,6 +90,8 @@ export const testWebhook = createServerFn({ method: "POST" })
           amount: 100,
           payment_method: "mpesa",
           status: "paid",
+          payment_status: "paid",
+          pushcut_source: "payment_webhook",
           created_at: new Date().toISOString(),
         },
       })
