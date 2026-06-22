@@ -301,6 +301,13 @@ export type Database = {
       products: {
         Row: {
           access_link: string | null
+          bump_button_text: string | null
+          bump_description: string | null
+          bump_enabled: boolean
+          bump_highlight_color: string | null
+          bump_image_url: string | null
+          bump_price: number | null
+          bump_title: string | null
           category: string | null
           checkout_banner_url: string | null
           created_at: string
@@ -325,6 +332,13 @@ export type Database = {
         }
         Insert: {
           access_link?: string | null
+          bump_button_text?: string | null
+          bump_description?: string | null
+          bump_enabled?: boolean
+          bump_highlight_color?: string | null
+          bump_image_url?: string | null
+          bump_price?: number | null
+          bump_title?: string | null
           category?: string | null
           checkout_banner_url?: string | null
           created_at?: string
@@ -349,6 +363,13 @@ export type Database = {
         }
         Update: {
           access_link?: string | null
+          bump_button_text?: string | null
+          bump_description?: string | null
+          bump_enabled?: boolean
+          bump_highlight_color?: string | null
+          bump_image_url?: string | null
+          bump_price?: number | null
+          bump_title?: string | null
           category?: string | null
           checkout_banner_url?: string | null
           created_at?: string
@@ -504,6 +525,8 @@ export type Database = {
       sales: {
         Row: {
           amount: number
+          bump_accepted: boolean
+          bump_amount: number | null
           created_at: string
           customer_id: string | null
           customer_name: string | null
@@ -519,6 +542,8 @@ export type Database = {
         }
         Insert: {
           amount: number
+          bump_accepted?: boolean
+          bump_amount?: number | null
           created_at?: string
           customer_id?: string | null
           customer_name?: string | null
@@ -534,6 +559,8 @@ export type Database = {
         }
         Update: {
           amount?: number
+          bump_accepted?: boolean
+          bump_amount?: number | null
           created_at?: string
           customer_id?: string | null
           customer_name?: string | null
