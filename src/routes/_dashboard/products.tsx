@@ -74,6 +74,15 @@ function ProductsPage() {
   const [imageUrl, setImageUrl] = useState<string>("");
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string>("");
+  // Order Bump
+  const [bumpEnabled, setBumpEnabled] = useState(false);
+  const [bumpTitle, setBumpTitle] = useState("");
+  const [bumpDescription, setBumpDescription] = useState("");
+  const [bumpPrice, setBumpPrice] = useState("");
+  const [bumpButtonText, setBumpButtonText] = useState("Sim, quero adicionar!");
+  const [bumpHighlightColor, setBumpHighlightColor] = useState("#16a34a");
+  const [bumpImageFile, setBumpImageFile] = useState<File | null>(null);
+  const [bumpImageUrl, setBumpImageUrl] = useState<string>("");
 
   const uploadProductImage = async (userId: string, file: File): Promise<string> => {
     const fileExt = file.name.split(".").pop();
