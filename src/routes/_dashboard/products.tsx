@@ -74,6 +74,15 @@ function ProductsPage() {
   const [imageUrl, setImageUrl] = useState<string>("");
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string>("");
+  // Order Bump
+  const [bumpEnabled, setBumpEnabled] = useState(false);
+  const [bumpTitle, setBumpTitle] = useState("");
+  const [bumpDescription, setBumpDescription] = useState("");
+  const [bumpPrice, setBumpPrice] = useState("");
+  const [bumpButtonText, setBumpButtonText] = useState("Sim, quero adicionar!");
+  const [bumpHighlightColor, setBumpHighlightColor] = useState("#16a34a");
+  const [bumpImageFile, setBumpImageFile] = useState<File | null>(null);
+  const [bumpImageUrl, setBumpImageUrl] = useState<string>("");
 
   const uploadProductImage = async (userId: string, file: File): Promise<string> => {
     const fileExt = file.name.split(".").pop();
@@ -151,6 +160,10 @@ function ProductsPage() {
       if (bannerFile) {
         uploadedBannerUrl = await uploadProductImage(user.id, bannerFile);
       }
+      let uploadedBumpImageUrl = "";
+      if (bumpImageFile) {
+        uploadedBumpImageUrl = await uploadProductImage(user.id, bumpImageFile);
+      }
 
       const { data, error } = await supabase
         .from("products")
@@ -170,7 +183,14 @@ function ProductsPage() {
           thank_you_button_text: thankYouButtonText || "Liberar acesso",
           image_url: uploadedImageUrl || null,
           checkout_banner_url: uploadedBannerUrl || null,
-        })
+          bump_enabled: bumpEnabled,
+          bump_title: bumpEnabled ? bumpTitle : null,
+          bump_description: bumpEnabled ? bumpDescription : null,
+          bump_price: bumpEnabled && bumpPrice ? parseFloat(bumpPrice) : null,
+          bump_button_text: bumpEnabled ? bumpButtonText : null,
+          bump_highlight_color: bumpEnabled ? bumpHighlightColor : null,
+          bump_image_url: bumpEnabled ? (uploadedBumpImageUrl || null) : null,
+        } as any)
         .select()
         .single();
 
@@ -225,6 +245,14 @@ function ProductsPage() {
     setImageUrl("");
     setBannerFile(null);
     setBannerUrl("");
+    setBumpEnabled(false);
+    setBumpTitle("");
+    setBumpDescription("");
+    setBumpPrice("");
+    setBumpButtonText("Sim, quero adicionar!");
+    setBumpHighlightColor("#16a34a");
+    setBumpImageFile(null);
+    setBumpImageUrl("");
   };
 
   const handleEditProduct = (product: any) => {
@@ -245,6 +273,14 @@ function ProductsPage() {
     setImageFile(null);
     setBannerUrl(product.checkout_banner_url || "");
     setBannerFile(null);
+    setBumpEnabled(!!product.bump_enabled);
+    setBumpTitle(product.bump_title || "");
+    setBumpDescription(product.bump_description || "");
+    setBumpPrice(product.bump_price != null ? String(product.bump_price) : "");
+    setBumpButtonText(product.bump_button_text || "Sim, quero adicionar!");
+    setBumpHighlightColor(product.bump_highlight_color || "#16a34a");
+    setBumpImageUrl(product.bump_image_url || "");
+    setBumpImageFile(null);
     setIsEditDialogOpen(true);
   };
 
@@ -260,6 +296,10 @@ function ProductsPage() {
       let finalBannerUrl = bannerUrl;
       if (bannerFile) {
         finalBannerUrl = await uploadProductImage(editingProduct.user_id, bannerFile);
+      }
+      let finalBumpImageUrl = bumpImageUrl;
+      if (bumpImageFile) {
+        finalBumpImageUrl = await uploadProductImage(editingProduct.user_id, bumpImageFile);
       }
 
       const { error } = await supabase
@@ -277,7 +317,14 @@ function ProductsPage() {
           thank_you_button_text: thankYouButtonText || "Liberar acesso",
           image_url: finalImageUrl || null,
           checkout_banner_url: finalBannerUrl || null,
-        })
+          bump_enabled: bumpEnabled,
+          bump_title: bumpEnabled ? bumpTitle : null,
+          bump_description: bumpEnabled ? bumpDescription : null,
+          bump_price: bumpEnabled && bumpPrice ? parseFloat(bumpPrice) : null,
+          bump_button_text: bumpEnabled ? bumpButtonText : null,
+          bump_highlight_color: bumpEnabled ? bumpHighlightColor : null,
+          bump_image_url: bumpEnabled ? (finalBumpImageUrl || null) : null,
+        } as any)
         .eq("id", editingProduct.id);
 
       if (error) throw error;
@@ -414,6 +461,49 @@ function ProductsPage() {
                     )}
                   </div>
                 </div>
+                {/* Order Bump (create) */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="font-semibold text-emerald-600">Order Bump (Oferta no checkout)</Label>
+                    <label className="inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" checked={bumpEnabled} onChange={(e) => setBumpEnabled(e.target.checked)} />
+                      <div className="relative w-10 h-6 bg-slate-200 rounded-full peer-checked:bg-emerald-600 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-transform peer-checked:after:translate-x-4" />
+                    </label>
+                  </div>
+                  {bumpEnabled && (
+                    <div className="grid gap-3">
+                      <div className="grid gap-2">
+                        <Label htmlFor="bump_title">Título</Label>
+                        <Input id="bump_title" value={bumpTitle} onChange={(e) => setBumpTitle(e.target.value)} placeholder="Ex: Adicione o bónus VIP" maxLength={80} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="bump_description">Descrição curta</Label>
+                        <Textarea id="bump_description" value={bumpDescription} onChange={(e) => setBumpDescription(e.target.value)} placeholder="Por apenas mais X MT, leve também..." rows={2} maxLength={160} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-2">
+                          <Label htmlFor="bump_price">Preço (MT)</Label>
+                          <Input id="bump_price" type="number" value={bumpPrice} onChange={(e) => setBumpPrice(e.target.value)} placeholder="200" />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="bump_color">Cor de destaque</Label>
+                          <Input id="bump_color" type="color" value={bumpHighlightColor} onChange={(e) => setBumpHighlightColor(e.target.value)} className="h-9 p-1" />
+                        </div>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="bump_button_text">Texto de chamada</Label>
+                        <Input id="bump_button_text" value={bumpButtonText} onChange={(e) => setBumpButtonText(e.target.value)} placeholder="Sim, quero adicionar!" maxLength={40} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="bump_image">Imagem (opcional)</Label>
+                        <Input id="bump_image" type="file" accept="image/*" onChange={(e) => setBumpImageFile(e.target.files?.[0] || null)} />
+                        {bumpImageFile && (
+                          <img src={URL.createObjectURL(bumpImageFile)} alt="Preview" className="mt-1 h-16 w-16 object-cover rounded border" />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <DialogFooter className="flex-col sm:flex-row gap-2">
                 <Button type="submit" className="w-full sm:w-auto">Criar Produto</Button>
@@ -530,6 +620,49 @@ function ProductsPage() {
                       </div>
                     )}
                   </div>
+                </div>
+                {/* Order Bump (edit) */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="font-semibold text-emerald-600">Order Bump (Oferta no checkout)</Label>
+                    <label className="inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" checked={bumpEnabled} onChange={(e) => setBumpEnabled(e.target.checked)} />
+                      <div className="relative w-10 h-6 bg-slate-200 rounded-full peer-checked:bg-emerald-600 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-transform peer-checked:after:translate-x-4" />
+                    </label>
+                  </div>
+                  {bumpEnabled && (
+                    <div className="grid gap-3">
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-bump_title">Título</Label>
+                        <Input id="edit-bump_title" value={bumpTitle} onChange={(e) => setBumpTitle(e.target.value)} placeholder="Ex: Adicione o bónus VIP" maxLength={80} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-bump_description">Descrição curta</Label>
+                        <Textarea id="edit-bump_description" value={bumpDescription} onChange={(e) => setBumpDescription(e.target.value)} placeholder="Por apenas mais X MT, leve também..." rows={2} maxLength={160} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-2">
+                          <Label htmlFor="edit-bump_price">Preço (MT)</Label>
+                          <Input id="edit-bump_price" type="number" value={bumpPrice} onChange={(e) => setBumpPrice(e.target.value)} placeholder="200" />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="edit-bump_color">Cor de destaque</Label>
+                          <Input id="edit-bump_color" type="color" value={bumpHighlightColor} onChange={(e) => setBumpHighlightColor(e.target.value)} className="h-9 p-1" />
+                        </div>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-bump_button_text">Texto de chamada</Label>
+                        <Input id="edit-bump_button_text" value={bumpButtonText} onChange={(e) => setBumpButtonText(e.target.value)} placeholder="Sim, quero adicionar!" maxLength={40} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-bump_image">Imagem (opcional)</Label>
+                        <Input id="edit-bump_image" type="file" accept="image/*" onChange={(e) => setBumpImageFile(e.target.files?.[0] || null)} />
+                        {(bumpImageFile || bumpImageUrl) && (
+                          <img src={bumpImageFile ? URL.createObjectURL(bumpImageFile) : bumpImageUrl} alt="Preview" className="mt-1 h-16 w-16 object-cover rounded border" />
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <DialogFooter>

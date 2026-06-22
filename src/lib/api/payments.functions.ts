@@ -12,6 +12,7 @@ const PaymentInput = z.object({
   customerName: z.string().min(1).max(100),
   contactPhone: z.string().max(20).optional(),
   trafficPageTrackingId: z.string().max(100).nullable().optional(),
+  bumpAccepted: z.boolean().optional(),
 });
 
 const PaymentSuccessInput = z.object({
@@ -109,7 +110,9 @@ export const processPayment = createServerFn({ method: "POST" })
         data.productId,
       );
 
-    let productQuery = supabaseAdmin.from("products").select("id, price, status, user_id");
+    let productQuery = supabaseAdmin
+      .from("products")
+      .select("id, price, status, user_id, bump_enabled, bump_price");
     productQuery = isUuid
       ? productQuery.eq("id", data.productId)
       : productQuery.eq("custom_url", data.productId);
@@ -124,7 +127,12 @@ export const processPayment = createServerFn({ method: "POST" })
       return { success: false, error: "Produto indisponível para compra." };
     }
 
-    const amount = Number(product.price);
+    const baseAmount = Number(product.price);
+    const bumpEligible = Boolean(
+      data.bumpAccepted && product.bump_enabled && product.bump_price && Number(product.bump_price) > 0,
+    );
+    const bumpAmount = bumpEligible ? Number(product.bump_price) : 0;
+    const amount = baseAmount + bumpAmount;
     if (!Number.isFinite(amount) || amount <= 0 || amount > 500_000) {
       return { success: false, error: "Valor do produto inválido." };
     }
@@ -193,7 +201,9 @@ export const processPayment = createServerFn({ method: "POST" })
         payment_method: data.method,
         status: "pending",
         traffic_page_id: finalTrafficPageId,
-      })
+        bump_accepted: bumpEligible,
+        bump_amount: bumpEligible ? bumpAmount : null,
+      } as any)
       .select("id")
       .single();
 
