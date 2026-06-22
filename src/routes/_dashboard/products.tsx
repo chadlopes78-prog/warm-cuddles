@@ -297,6 +297,10 @@ function ProductsPage() {
       if (bannerFile) {
         finalBannerUrl = await uploadProductImage(editingProduct.user_id, bannerFile);
       }
+      let finalBumpImageUrl = bumpImageUrl;
+      if (bumpImageFile) {
+        finalBumpImageUrl = await uploadProductImage(editingProduct.user_id, bumpImageFile);
+      }
 
       const { error } = await supabase
         .from("products")
@@ -313,7 +317,14 @@ function ProductsPage() {
           thank_you_button_text: thankYouButtonText || "Liberar acesso",
           image_url: finalImageUrl || null,
           checkout_banner_url: finalBannerUrl || null,
-        })
+          bump_enabled: bumpEnabled,
+          bump_title: bumpEnabled ? bumpTitle : null,
+          bump_description: bumpEnabled ? bumpDescription : null,
+          bump_price: bumpEnabled && bumpPrice ? parseFloat(bumpPrice) : null,
+          bump_button_text: bumpEnabled ? bumpButtonText : null,
+          bump_highlight_color: bumpEnabled ? bumpHighlightColor : null,
+          bump_image_url: bumpEnabled ? (finalBumpImageUrl || null) : null,
+        } as any)
         .eq("id", editingProduct.id);
 
       if (error) throw error;
