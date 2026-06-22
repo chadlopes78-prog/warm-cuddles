@@ -621,6 +621,49 @@ function ProductsPage() {
                     )}
                   </div>
                 </div>
+                {/* Order Bump (edit) */}
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label className="font-semibold text-emerald-600">Order Bump (Oferta no checkout)</Label>
+                    <label className="inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" checked={bumpEnabled} onChange={(e) => setBumpEnabled(e.target.checked)} />
+                      <div className="relative w-10 h-6 bg-slate-200 rounded-full peer-checked:bg-emerald-600 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-transform peer-checked:after:translate-x-4" />
+                    </label>
+                  </div>
+                  {bumpEnabled && (
+                    <div className="grid gap-3">
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-bump_title">Título</Label>
+                        <Input id="edit-bump_title" value={bumpTitle} onChange={(e) => setBumpTitle(e.target.value)} placeholder="Ex: Adicione o bónus VIP" maxLength={80} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-bump_description">Descrição curta</Label>
+                        <Textarea id="edit-bump_description" value={bumpDescription} onChange={(e) => setBumpDescription(e.target.value)} placeholder="Por apenas mais X MT, leve também..." rows={2} maxLength={160} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-2">
+                          <Label htmlFor="edit-bump_price">Preço (MT)</Label>
+                          <Input id="edit-bump_price" type="number" value={bumpPrice} onChange={(e) => setBumpPrice(e.target.value)} placeholder="200" />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="edit-bump_color">Cor de destaque</Label>
+                          <Input id="edit-bump_color" type="color" value={bumpHighlightColor} onChange={(e) => setBumpHighlightColor(e.target.value)} className="h-9 p-1" />
+                        </div>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-bump_button_text">Texto de chamada</Label>
+                        <Input id="edit-bump_button_text" value={bumpButtonText} onChange={(e) => setBumpButtonText(e.target.value)} placeholder="Sim, quero adicionar!" maxLength={40} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="edit-bump_image">Imagem (opcional)</Label>
+                        <Input id="edit-bump_image" type="file" accept="image/*" onChange={(e) => setBumpImageFile(e.target.files?.[0] || null)} />
+                        {(bumpImageFile || bumpImageUrl) && (
+                          <img src={bumpImageFile ? URL.createObjectURL(bumpImageFile) : bumpImageUrl} alt="Preview" className="mt-1 h-16 w-16 object-cover rounded border" />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <DialogFooter>
                 <Button type="submit">Salvar Alterações</Button>
