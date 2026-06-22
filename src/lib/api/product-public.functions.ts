@@ -50,20 +50,17 @@ export const getPublicProduct = createServerFn({ method: "GET" })
       return { product: null, checkout: null, defaultPixel: null };
     }
 
-    const [checkoutRes, pixelRes] = await Promise.all([
-      supabase.from("checkouts").select("*").eq("product_id", product.id).maybeSingle(),
-      product.facebook_pixel_id
-        ? Promise.resolve({ data: null })
-        : supabase
-            .from("pixel_configs")
-            .select("fb_pixel_id")
-            .eq("user_id", product.user_id)
-            .maybeSingle(),
-    ]);
+    const pixelRes = product.facebook_pixel_id
+      ? { data: null }
+      : await supabase
+          .from("pixel_configs")
+          .select("fb_pixel_id")
+          .eq("user_id", product.user_id)
+          .maybeSingle();
 
     return {
       product,
-      checkout: checkoutRes.data ?? null,
+      checkout: null,
       defaultPixel: pixelRes.data ?? null,
     };
   });

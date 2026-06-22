@@ -21,6 +21,10 @@ import { cn } from "@/lib/utils";
 import mozFlag from "@/assets/moz-flag.png.asset.json";
 
 export const Route = createFileRoute("/p/$productId")({
+  staleTime: 60_000,
+  preloadStaleTime: 60_000,
+  pendingMs: 0,
+  pendingMinMs: 0,
   loader: async ({ params: { productId } }) => {
     try {
       return await getPublicProduct({ data: { productId } });
@@ -45,8 +49,37 @@ export const Route = createFileRoute("/p/$productId")({
         : [],
     };
   },
+  pendingComponent: CheckoutSkeleton,
   component: CheckoutPage,
 });
+
+function CheckoutSkeleton() {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      <div className="mx-auto max-w-[440px] px-3 py-3 sm:py-5">
+        <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-slate-200/60 overflow-hidden animate-pulse">
+          <div className="p-4 flex gap-3 items-center border-b border-slate-100">
+            <div className="h-14 w-14 bg-slate-200 rounded-xl" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 bg-slate-200 rounded w-3/4" />
+              <div className="h-6 bg-slate-200 rounded w-1/3" />
+            </div>
+          </div>
+          <div className="p-4 space-y-3">
+            <div className="h-12 bg-slate-100 rounded-xl" />
+            <div className="h-12 bg-slate-100 rounded-xl" />
+            <div className="grid grid-cols-2 gap-2">
+              <div className="h-12 bg-slate-100 rounded-xl" />
+              <div className="h-12 bg-slate-100 rounded-xl" />
+            </div>
+            <div className="h-12 bg-slate-100 rounded-xl" />
+            <div className="h-14 bg-slate-200 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 declare global {
   interface Window {
