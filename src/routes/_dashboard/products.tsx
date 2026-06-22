@@ -245,6 +245,14 @@ function ProductsPage() {
     setImageUrl("");
     setBannerFile(null);
     setBannerUrl("");
+    setBumpEnabled(false);
+    setBumpTitle("");
+    setBumpDescription("");
+    setBumpPrice("");
+    setBumpButtonText("Sim, quero adicionar!");
+    setBumpHighlightColor("#16a34a");
+    setBumpImageFile(null);
+    setBumpImageUrl("");
   };
 
   const handleEditProduct = (product: any) => {
