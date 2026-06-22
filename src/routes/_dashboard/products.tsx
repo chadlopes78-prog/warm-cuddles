@@ -375,17 +375,7 @@ function ProductsPage() {
                   <Label className="font-semibold mb-2 block text-[#E30613]">Configurações de Acesso (Obrigatório)</Label>
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="access_link">Link de Acesso Principal</Label>
-                        <Input 
-                          id="access_link" 
-                          value={accessLink} 
-                          onChange={(e) => setAccessLink(e.target.value)} 
-                          placeholder="Link do produto, grupo, ou arquivo" 
-                          required 
-                        />
-                        <p className="text-[10px] text-muted-foreground italic">Este link será usado no botão da página de obrigado após o pagamento.</p>
-                    </div>
-                    <div className="grid gap-2">
+
                         <Label htmlFor="thank_you_button_text">Texto do Botão (Página de Obrigado)</Label>
                         <Input
                           id="thank_you_button_text"
@@ -509,16 +499,7 @@ function ProductsPage() {
                   <Label className="font-semibold mb-2 block text-[#E30613]">Configurações de Acesso (Obrigatório)</Label>
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="edit-access_link">Link de Acesso Principal</Label>
-                        <Input 
-                          id="edit-access_link" 
-                          value={accessLink} 
-                          onChange={(e) => setAccessLink(e.target.value)} 
-                          placeholder="Link do produto, grupo, ou arquivo" 
-                          required 
-                        />
-                    </div>
-                    <div className="grid gap-2">
+
                         <Label htmlFor="edit-thank_you_button_text">Texto do Botão (Página de Obrigado)</Label>
                         <Input
                           id="edit-thank_you_button_text"
