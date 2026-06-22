@@ -122,10 +122,10 @@ export function normalizeGatewayStatus(input: unknown, httpOk = true): Normalize
   // Não marcar como "paid" apenas por success:true / mensagem "sucesso" —
   // gateways como Payflax retornam isso ao só solicitar o PIN ao cliente.
   // Apenas status explícitos em PAID_STATUSES contam como aprovado.
-  void combinedSuccessMessage;
+  void successText;
   if (
     /(customer\s+did\s+not\s+enter\s+pin|pin\s+incorret|recus|reject|declin|cancel|insufficient|saldo\s+insuficiente)/i.test(
-      `${combinedSuccessMessage} ${raw}`,
+      `${message} ${raw}`,
     )
   ) {
     return "failed";
