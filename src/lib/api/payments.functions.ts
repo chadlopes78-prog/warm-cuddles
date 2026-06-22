@@ -310,7 +310,10 @@ export const processPayment = createServerFn({ method: "POST" })
           transactionId: transactionId ? String(transactionId) : null,
           reference,
           rawPayload: json,
-          triggerPushcut: true,
+          // Não dispara Pushcut aqui: a resposta inline do gateway pode indicar
+          // apenas "PIN solicitado". O webhook oficial do gateway é a única
+          // fonte autorizada a disparar a notificação de venda aprovada.
+          triggerPushcut: false,
         });
       } else if (finalStatus === "failed" || finalStatus === "expired") {
         const messageSource =
