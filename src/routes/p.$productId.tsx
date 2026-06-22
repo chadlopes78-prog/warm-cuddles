@@ -200,6 +200,7 @@ function CheckoutPage() {
           customerName: name,
           contactPhone: contactPhone || undefined,
           trafficPageTrackingId: trafficPageId,
+          bumpAccepted: bumpAccepted && !!product?.bump_enabled,
         },
       })) as PaymentResult;
 
