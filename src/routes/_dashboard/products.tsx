@@ -160,15 +160,6 @@ function ProductsPage() {
       if (bannerFile) {
         uploadedBannerUrl = await uploadProductImage(user.id, bannerFile);
       }
-
-      let uploadedImageUrl = "";
-      if (imageFile) {
-        uploadedImageUrl = await uploadProductImage(user.id, imageFile);
-      }
-      let uploadedBannerUrl = "";
-      if (bannerFile) {
-        uploadedBannerUrl = await uploadProductImage(user.id, bannerFile);
-      }
       let uploadedBumpImageUrl = "";
       if (bumpImageFile) {
         uploadedBumpImageUrl = await uploadProductImage(user.id, bumpImageFile);
