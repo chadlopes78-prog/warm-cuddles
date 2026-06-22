@@ -201,7 +201,9 @@ export const processPayment = createServerFn({ method: "POST" })
         payment_method: data.method,
         status: "pending",
         traffic_page_id: finalTrafficPageId,
-      })
+        bump_accepted: bumpEligible,
+        bump_amount: bumpEligible ? bumpAmount : null,
+      } as any)
       .select("id")
       .single();
 
