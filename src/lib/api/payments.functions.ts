@@ -310,6 +310,7 @@ export const processPayment = createServerFn({ method: "POST" })
           transactionId: transactionId ? String(transactionId) : null,
           reference,
           rawPayload: json,
+          triggerPushcut: true,
         });
       } else if (finalStatus === "failed" || finalStatus === "expired") {
         const messageSource =
