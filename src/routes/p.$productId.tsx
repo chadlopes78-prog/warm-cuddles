@@ -104,6 +104,7 @@ function CheckoutPage() {
   const [contactPhone, setContactPhone] = useState("");
   const [phone, setPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "emola">("mpesa");
+  const [bumpAccepted, setBumpAccepted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(600);
 
   useEffect(() => {
