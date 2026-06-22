@@ -538,7 +538,7 @@ export type Database = {
           status: string | null
           traffic_page_id: string | null
           transaction_id: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           amount: number
@@ -555,7 +555,7 @@ export type Database = {
           status?: string | null
           traffic_page_id?: string | null
           transaction_id?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           amount?: number
@@ -572,7 +572,7 @@ export type Database = {
           status?: string | null
           traffic_page_id?: string | null
           transaction_id?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -790,6 +790,7 @@ export type Database = {
       }
     }
     Functions: {
+      clean_invalid_sales: { Args: never; Returns: Json }
       get_dashboard_metrics: {
         Args: { p_end_date: string; p_start_date: string }
         Returns: Json
