@@ -157,18 +157,27 @@ function TransactionsPage() {
         <Button
           variant="outline"
           onClick={async () => {
+            if (!confirm("Remover registros inválidos e duplicados? Esta ação não pode ser desfeita.")) return;
             const { data, error } = await supabase.rpc("clean_invalid_sales");
             if (error) {
               toast.error(error.message);
               return;
             }
-            const deleted = (data as { deleted?: number } | null)?.deleted ?? 0;
-            toast.success(`${deleted} registo(s) inválido(s) removido(s)`);
+            const r = (data as { deleted?: number; invalid?: number; duplicates_transaction?: number; duplicates_phone?: number } | null) ?? {};
+            const total = r.deleted ?? 0;
+            toast.success(
+              total === 0
+                ? "Nenhum registro inválido ou duplicado encontrado"
+                : `${total} removido(s) · ${r.invalid ?? 0} inválido(s), ${r.duplicates_transaction ?? 0} dup. (transação), ${r.duplicates_phone ?? 0} dup. (telefone)`,
+            );
             queryClient.invalidateQueries({ queryKey: ["transactions"] });
+            queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+            queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
           }}
         >
-          🧹 Limpar Registros Inválidos
+          🧹 Limpar Dados
         </Button>
+
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
