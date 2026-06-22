@@ -264,7 +264,7 @@ function CheckoutPage() {
               <h1 className="text-sm font-semibold text-slate-900 leading-tight truncate">{product.name}</h1>
               <div className="flex items-baseline gap-1 mt-0.5">
                 <span className="text-2xl font-black text-slate-900 tracking-tight tabular-nums">
-                  {product.price.toLocaleString("pt-MZ")}
+                  {(Number(product.price) + (bumpAccepted && product.bump_enabled && product.bump_price ? Number(product.bump_price) : 0)).toLocaleString("pt-MZ")}
                 </span>
                 <span className="text-xs font-semibold text-slate-500">MT</span>
               </div>
