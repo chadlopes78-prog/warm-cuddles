@@ -20,7 +20,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PProductIdRouteImport } from './routes/p.$productId'
 import { Route as DashboardTransactionsRouteImport } from './routes/_dashboard/transactions'
 import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/settings'
-import { Route as DashboardSalesRouteImport } from './routes/_dashboard/sales'
 import { Route as DashboardRecoveryRouteImport } from './routes/_dashboard/recovery'
 import { Route as DashboardProductsRouteImport } from './routes/_dashboard/products'
 import { Route as DashboardPixelRouteImport } from './routes/_dashboard/pixel'
@@ -85,11 +84,6 @@ const DashboardSettingsRoute = DashboardSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardSalesRoute = DashboardSalesRouteImport.update({
-  id: '/sales',
-  path: '/sales',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardRecoveryRoute = DashboardRecoveryRouteImport.update({
   id: '/recovery',
   path: '/recovery',
@@ -151,7 +145,6 @@ export interface FileRoutesByFullPath {
   '/pixel': typeof DashboardPixelRoute
   '/products': typeof DashboardProductsRoute
   '/recovery': typeof DashboardRecoveryRoute
-  '/sales': typeof DashboardSalesRoute
   '/settings': typeof DashboardSettingsRoute
   '/transactions': typeof DashboardTransactionsRoute
   '/p/$productId': typeof PProductIdRoute
@@ -173,7 +166,6 @@ export interface FileRoutesByTo {
   '/pixel': typeof DashboardPixelRoute
   '/products': typeof DashboardProductsRoute
   '/recovery': typeof DashboardRecoveryRoute
-  '/sales': typeof DashboardSalesRoute
   '/settings': typeof DashboardSettingsRoute
   '/transactions': typeof DashboardTransactionsRoute
   '/p/$productId': typeof PProductIdRoute
@@ -197,7 +189,6 @@ export interface FileRoutesById {
   '/_dashboard/pixel': typeof DashboardPixelRoute
   '/_dashboard/products': typeof DashboardProductsRoute
   '/_dashboard/recovery': typeof DashboardRecoveryRoute
-  '/_dashboard/sales': typeof DashboardSalesRoute
   '/_dashboard/settings': typeof DashboardSettingsRoute
   '/_dashboard/transactions': typeof DashboardTransactionsRoute
   '/p/$productId': typeof PProductIdRoute
@@ -221,7 +212,6 @@ export interface FileRouteTypes {
     | '/pixel'
     | '/products'
     | '/recovery'
-    | '/sales'
     | '/settings'
     | '/transactions'
     | '/p/$productId'
@@ -243,7 +233,6 @@ export interface FileRouteTypes {
     | '/pixel'
     | '/products'
     | '/recovery'
-    | '/sales'
     | '/settings'
     | '/transactions'
     | '/p/$productId'
@@ -266,7 +255,6 @@ export interface FileRouteTypes {
     | '/_dashboard/pixel'
     | '/_dashboard/products'
     | '/_dashboard/recovery'
-    | '/_dashboard/sales'
     | '/_dashboard/settings'
     | '/_dashboard/transactions'
     | '/p/$productId'
@@ -368,13 +356,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/_dashboard/sales': {
-      id: '/_dashboard/sales'
-      path: '/sales'
-      fullPath: '/sales'
-      preLoaderRoute: typeof DashboardSalesRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/_dashboard/recovery': {
       id: '/_dashboard/recovery'
       path: '/recovery'
@@ -448,7 +429,6 @@ interface DashboardRouteChildren {
   DashboardPixelRoute: typeof DashboardPixelRoute
   DashboardProductsRoute: typeof DashboardProductsRoute
   DashboardRecoveryRoute: typeof DashboardRecoveryRoute
-  DashboardSalesRoute: typeof DashboardSalesRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardTransactionsRoute: typeof DashboardTransactionsRoute
   DashboardReportsTrafficRoute: typeof DashboardReportsTrafficRoute
@@ -461,7 +441,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardPixelRoute: DashboardPixelRoute,
   DashboardProductsRoute: DashboardProductsRoute,
   DashboardRecoveryRoute: DashboardRecoveryRoute,
-  DashboardSalesRoute: DashboardSalesRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardTransactionsRoute: DashboardTransactionsRoute,
   DashboardReportsTrafficRoute: DashboardReportsTrafficRoute,
