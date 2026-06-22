@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Receipt, Search, ArrowDownCircle, ArrowUpCircle, Wallet } from "lucide-react";
+import { Receipt, Search, ArrowDownCircle, ArrowUpCircle, Wallet, CheckCircle2, XCircle, TrendingUp, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
