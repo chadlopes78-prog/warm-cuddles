@@ -161,6 +161,19 @@ function ProductsPage() {
         uploadedBannerUrl = await uploadProductImage(user.id, bannerFile);
       }
 
+      let uploadedImageUrl = "";
+      if (imageFile) {
+        uploadedImageUrl = await uploadProductImage(user.id, imageFile);
+      }
+      let uploadedBannerUrl = "";
+      if (bannerFile) {
+        uploadedBannerUrl = await uploadProductImage(user.id, bannerFile);
+      }
+      let uploadedBumpImageUrl = "";
+      if (bumpImageFile) {
+        uploadedBumpImageUrl = await uploadProductImage(user.id, bumpImageFile);
+      }
+
       const { data, error } = await supabase
         .from("products")
         .insert({
@@ -179,7 +192,14 @@ function ProductsPage() {
           thank_you_button_text: thankYouButtonText || "Liberar acesso",
           image_url: uploadedImageUrl || null,
           checkout_banner_url: uploadedBannerUrl || null,
-        })
+          bump_enabled: bumpEnabled,
+          bump_title: bumpEnabled ? bumpTitle : null,
+          bump_description: bumpEnabled ? bumpDescription : null,
+          bump_price: bumpEnabled && bumpPrice ? parseFloat(bumpPrice) : null,
+          bump_button_text: bumpEnabled ? bumpButtonText : null,
+          bump_highlight_color: bumpEnabled ? bumpHighlightColor : null,
+          bump_image_url: bumpEnabled ? (uploadedBumpImageUrl || null) : null,
+        } as any)
         .select()
         .single();
 
