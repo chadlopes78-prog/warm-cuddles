@@ -12,6 +12,7 @@ const PaymentInput = z.object({
   customerName: z.string().min(1).max(100),
   contactPhone: z.string().max(20).optional(),
   trafficPageTrackingId: z.string().max(100).nullable().optional(),
+  bumpAccepted: z.boolean().optional(),
 });
 
 const PaymentSuccessInput = z.object({
