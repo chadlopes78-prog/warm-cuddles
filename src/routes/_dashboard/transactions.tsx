@@ -176,7 +176,6 @@ function TransactionsPage() {
             onClick={async () => {
               if (!confirm("APAGAR TODAS as suas transações? Ação permanente.")) return;
               if (!confirm("Tem certeza absoluta? Todo o histórico será removido.")) return;
-              // @ts-expect-error rpc name added in latest migration; types may lag
               const { data, error } = await supabase.rpc("wipe_all_sales");
               if (error) { toast.error(error.message); return; }
               const deleted = (data as { deleted?: number } | null)?.deleted ?? 0;
