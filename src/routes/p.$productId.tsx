@@ -105,7 +105,7 @@ function CheckoutPage() {
   const [phone, setPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "emola">("mpesa");
   const [bumpAccepted, setBumpAccepted] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(600);
+  const [timeLeft, setTimeLeft] = useState(360);
 
   useEffect(() => {
     const timer = setInterval(() => {
