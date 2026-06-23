@@ -272,8 +272,9 @@ function DashboardLayout() {
       <nav className="flex-1 space-y-1 p-3">
         {menuItems.map((item) => {
           const isExpanded = expandedMenus.includes(item.name);
-          const hasSubItems = item.subItems && item.subItems.length > 0;
-          const isActive = location.pathname === item.path || (hasSubItems && item.subItems?.some(sub => location.pathname === sub.path));
+          const subItems = (item as { subItems?: { name: string; icon: typeof item.icon; path: string }[] }).subItems;
+          const hasSubItems = !!subItems && subItems.length > 0;
+          const isActive = location.pathname === item.path || (hasSubItems && subItems!.some(sub => location.pathname === sub.path));
 
           return (
             <div key={item.name} className="space-y-1">
