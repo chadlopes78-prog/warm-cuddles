@@ -799,6 +799,7 @@ export type Database = {
         Args: { _product_id: string }
         Returns: boolean
       }
+      wipe_all_sales: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never
