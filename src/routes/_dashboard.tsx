@@ -239,14 +239,7 @@ function DashboardLayout() {
     { name: "Produtos", icon: Package, path: "/products" },
     { name: "Transações", icon: Receipt, path: "/transactions" },
     { name: "Clientes", icon: Users, path: "/customers" },
-    { 
-      name: "Relatórios", 
-      icon: BarChart3, 
-      path: "/dashboard",
-      subItems: [
-        { name: "Análise de Tráfego", icon: Globe, path: "/reports/traffic" }
-      ]
-    },
+    { name: "Relatórios", icon: BarChart3, path: "/dashboard" },
     { name: "Pixel Facebook", icon: Target, path: "/pixel" },
     { name: "Assistente IA", icon: Zap, path: "/dashboard", params: { tab: 'ai' } },
     ...(profile?.role === 'admin' || isAdminEmail(user?.email) ? [{ name: "Painel Operacional", icon: ShieldCheck, path: "/admin" }] : []),
