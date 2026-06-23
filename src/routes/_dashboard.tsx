@@ -295,7 +295,7 @@ function DashboardLayout() {
               ) : (
                 <Link
                   to={item.path}
-                  search={item.params}
+                  
                   className={cn(
                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all hover:bg-slate-100 active:scale-95",
                     isActive ? "bg-slate-100 text-slate-900" : "text-slate-600",
