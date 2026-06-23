@@ -61,9 +61,13 @@ function TransactionsPage() {
   const { data: sales, isLoading } = useQuery({
     queryKey: ["transactions"],
     queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      if (!uid) return [];
       const { data, error } = await supabase
         .from("sales")
         .select("*, products(name)")
+        .eq("user_id", uid)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
