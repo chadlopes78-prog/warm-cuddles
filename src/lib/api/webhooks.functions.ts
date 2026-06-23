@@ -44,7 +44,7 @@ export const upsertWebhook = createServerFn({ method: "POST" })
     const insertRow = { ...baseRow, secret: hasSecret ? data.secret : null };
     const { data: ins, error } = await context.supabase
       .from("webhook_endpoints")
-      .insert(row)
+      .insert(insertRow)
       .select("id")
       .single();
     if (error) throw new Error(error.message);
