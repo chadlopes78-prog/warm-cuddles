@@ -23,7 +23,7 @@ interface Endpoint {
   id: string;
   name: string;
   url: string;
-  secret: string | null;
+  secret?: string | null;
   events: string[];
   product_ids: string[];
   is_pushcut: boolean;
