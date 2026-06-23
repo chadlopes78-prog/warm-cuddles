@@ -250,7 +250,7 @@ function CheckoutPage() {
         {/* Top countdown banner */}
         <div className="bg-red-600 text-white rounded-xl mb-2 px-3 py-2 flex items-center justify-center gap-2 shadow-sm">
           <Clock className="h-4 w-4" />
-          <span className="text-xs font-bold uppercase tracking-wide">Expira em</span>
+          <span className="text-xs font-bold uppercase tracking-wide">Essa oferta expira em</span>
           <span className="text-sm font-black tabular-nums bg-white/15 px-2 py-0.5 rounded-md">
             {formatTime(timeLeft)}
           </span>
