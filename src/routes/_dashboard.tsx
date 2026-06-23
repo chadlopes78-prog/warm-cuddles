@@ -310,7 +310,7 @@ function DashboardLayout() {
 
               {hasSubItems && isExpanded && (isSidebarOpen || isMobileMenuOpen) && (
                 <div className="ml-4 space-y-1 border-l pl-4">
-                  {item.subItems?.map((subItem) => (
+                  {subItems!.map((subItem) => (
                     <Link
                       key={subItem.path}
                       to={subItem.path}
