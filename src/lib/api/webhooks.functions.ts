@@ -19,25 +19,29 @@ export const upsertWebhook = createServerFn({ method: "POST" })
   .inputValidator((d) => UpsertSchema.parse(d))
   .handler(async ({ data, context }) => {
     const events = data.events.filter((e) => (WEBHOOK_EVENT_IDS as string[]).includes(e));
-    const row = {
+    const baseRow = {
       user_id: context.userId,
       name: data.name,
       url: data.url,
-      secret: data.secret || null,
       events,
       product_ids: data.product_ids ?? [],
       is_pushcut: data.is_pushcut,
       active: data.active,
     };
+    const hasSecret = typeof data.secret === "string" && data.secret.length > 0;
     if (data.id) {
+      // On update, only overwrite secret if user supplied a new one (UI can no longer
+      // read the existing value back to pre-fill the form).
+      const updateRow = hasSecret ? { ...baseRow, secret: data.secret } : baseRow;
       const { error } = await context.supabase
         .from("webhook_endpoints")
-        .update(row)
+        .update(updateRow)
         .eq("id", data.id)
         .eq("user_id", context.userId);
       if (error) throw new Error(error.message);
       return { id: data.id };
     }
+    const insertRow = { ...baseRow, secret: hasSecret ? data.secret : null };
     const { data: ins, error } = await context.supabase
       .from("webhook_endpoints")
       .insert(row)
