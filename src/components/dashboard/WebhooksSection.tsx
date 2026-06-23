@@ -23,7 +23,7 @@ interface Endpoint {
   id: string;
   name: string;
   url: string;
-  secret: string | null;
+  secret?: string | null;
   events: string[];
   product_ids: string[];
   is_pushcut: boolean;
@@ -68,7 +68,7 @@ export function WebhooksSection() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("webhook_endpoints")
-        .select("*")
+        .select("id, name, url, active, is_pushcut, events, product_ids, user_id, created_at, updated_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Endpoint[];
