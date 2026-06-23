@@ -154,29 +154,41 @@ function TransactionsPage() {
             Dados em tempo real. Acompanhe todos os pagamentos processados (M-Pesa e e-Mola).
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={async () => {
-            if (!confirm("Remover registros inválidos e duplicados? Esta ação não pode ser desfeita.")) return;
-            const { data, error } = await supabase.rpc("clean_invalid_sales");
-            if (error) {
-              toast.error(error.message);
-              return;
-            }
-            const r = (data as { deleted?: number; invalid?: number; duplicates_transaction?: number; duplicates_phone?: number } | null) ?? {};
-            const total = r.deleted ?? 0;
-            toast.success(
-              total === 0
-                ? "Nenhum registro inválido ou duplicado encontrado"
-                : `${total} removido(s) · ${r.invalid ?? 0} inválido(s), ${r.duplicates_transaction ?? 0} dup. (transação), ${r.duplicates_phone ?? 0} dup. (telefone)`,
-            );
-            queryClient.invalidateQueries({ queryKey: ["transactions"] });
-            queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-            queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
-          }}
-        >
-          🧹 Limpar Dados
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (!confirm("Remover registros inválidos e duplicados?")) return;
+              const { data, error } = await supabase.rpc("clean_invalid_sales");
+              if (error) { toast.error(error.message); return; }
+              const r = (data as { deleted?: number; invalid?: number; duplicates_transaction?: number; duplicates_phone?: number } | null) ?? {};
+              const total = r.deleted ?? 0;
+              toast.success(total === 0 ? "Nenhum registro inválido ou duplicado" : `${total} removido(s)`);
+              await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+              await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+              await queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
+            }}
+          >
+            🧹 Limpar Inválidos
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={async () => {
+              if (!confirm("APAGAR TODAS as suas transações? Ação permanente.")) return;
+              if (!confirm("Tem certeza absoluta? Todo o histórico será removido.")) return;
+              const { data, error } = await supabase.rpc("wipe_all_sales");
+              if (error) { toast.error(error.message); return; }
+              const deleted = (data as { deleted?: number } | null)?.deleted ?? 0;
+              toast.success(deleted === 0 ? "Nada para remover" : `${deleted} transação(ões) removida(s)`);
+              await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+              await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+              await queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
+            }}
+          >
+            🗑️ Limpar Dados
+          </Button>
+        </div>
+
 
       </div>
 
