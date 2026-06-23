@@ -239,14 +239,7 @@ function DashboardLayout() {
     { name: "Produtos", icon: Package, path: "/products" },
     { name: "Transações", icon: Receipt, path: "/transactions" },
     { name: "Clientes", icon: Users, path: "/customers" },
-    { 
-      name: "Relatórios", 
-      icon: BarChart3, 
-      path: "/dashboard",
-      subItems: [
-        { name: "Análise de Tráfego", icon: Globe, path: "/reports/traffic" }
-      ]
-    },
+    { name: "Relatórios", icon: BarChart3, path: "/dashboard" },
     { name: "Pixel Facebook", icon: Target, path: "/pixel" },
     { name: "Assistente IA", icon: Zap, path: "/dashboard", params: { tab: 'ai' } },
     ...(profile?.role === 'admin' || isAdminEmail(user?.email) ? [{ name: "Painel Operacional", icon: ShieldCheck, path: "/admin" }] : []),
@@ -279,8 +272,9 @@ function DashboardLayout() {
       <nav className="flex-1 space-y-1 p-3">
         {menuItems.map((item) => {
           const isExpanded = expandedMenus.includes(item.name);
-          const hasSubItems = item.subItems && item.subItems.length > 0;
-          const isActive = location.pathname === item.path || (hasSubItems && item.subItems?.some(sub => location.pathname === sub.path));
+          const subItems = (item as { subItems?: { name: string; icon: typeof item.icon; path: string }[] }).subItems;
+          const hasSubItems = !!subItems && subItems.length > 0;
+          const isActive = location.pathname === item.path || (hasSubItems && subItems!.some(sub => location.pathname === sub.path));
 
           return (
             <div key={item.name} className="space-y-1">
@@ -316,7 +310,7 @@ function DashboardLayout() {
 
               {hasSubItems && isExpanded && (isSidebarOpen || isMobileMenuOpen) && (
                 <div className="ml-4 space-y-1 border-l pl-4">
-                  {item.subItems?.map((subItem) => (
+                  {subItems!.map((subItem) => (
                     <Link
                       key={subItem.path}
                       to={subItem.path}
