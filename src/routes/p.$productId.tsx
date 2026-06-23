@@ -489,22 +489,6 @@ function CheckoutPage() {
               )}
             </Button>
 
-            {/* Trust strip */}
-            <div className="flex items-center justify-center gap-4 pt-2">
-              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                <ShieldCheck className="h-3 w-3" />
-                Seguro
-              </div>
-              <div className="h-3 w-px bg-slate-200" />
-              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                <Lock className="h-3 w-3" />
-                Criptografado
-              </div>
-              <div className="h-3 w-px bg-slate-200" />
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                PagamentosMZ
-              </div>
-            </div>
           </form>
         </div>
       </div>
