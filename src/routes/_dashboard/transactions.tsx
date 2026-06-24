@@ -319,11 +319,11 @@ function TransactionsPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12">Carregando transações...</TableCell>
+                  <TableCell colSpan={9} className="text-center py-12">Carregando transações...</TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                     Nenhuma transação encontrada.
                   </TableCell>
                 </TableRow>
