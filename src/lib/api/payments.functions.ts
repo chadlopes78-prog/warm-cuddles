@@ -348,6 +348,7 @@ export const processPayment = createServerFn({ method: "POST" })
           .from("sales")
           .update({
             status: "pending",
+            status_reason: pendingReasonForMethod(gatewayMethod, "processing").label,
             transaction_id: transactionId ? String(transactionId).slice(0, 200) : null,
             payment_reference: reference,
           })
@@ -364,7 +365,11 @@ export const processPayment = createServerFn({ method: "POST" })
       console.error("processPayment error", err);
       await supabaseAdmin
         .from("sales")
-        .update({ status: "pending", payment_reference: reference })
+        .update({
+          status: "pending",
+          status_reason: pendingReasonForMethod(gatewayMethod, "awaiting_customer").label,
+          payment_reference: reference,
+        })
         .neq("status", "paid")
         .eq("id", sale.id);
       return { success: true, saleId: sale.id, transactionId: null };
