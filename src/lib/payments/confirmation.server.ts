@@ -327,10 +327,12 @@ export async function markSaleTerminalFailure(options: {
 }) {
   const { saleId, status, transactionId, reference, reason } = options;
   const finalStatus = status === "expired" ? "failed" : "failed";
+  const reasonInfo = classifyFailureReason(reason, status);
   const { data: updated, error } = await supabaseAdmin
     .from("sales")
     .update({
       status: finalStatus,
+      status_reason: reasonInfo.label,
       transaction_id: transactionId ? transactionId.slice(0, 200) : undefined,
       payment_reference: reference
         ? reference.slice(0, 200)
