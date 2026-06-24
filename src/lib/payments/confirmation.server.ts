@@ -141,6 +141,86 @@ export function normalizeGatewayStatus(input: unknown, httpOk = true): Normalize
   return "pending";
 }
 
+export type FailureReasonCode =
+  | "insufficient_funds"
+  | "invalid_number"
+  | "timeout"
+  | "cancelled"
+  | "network_error"
+  | "daily_limit"
+  | "unknown_error";
+
+export type PendingReasonCode =
+  | "awaiting_emola_confirmation"
+  | "awaiting_mpesa_confirmation"
+  | "awaiting_customer_payment"
+  | "processing"
+  | "timeout";
+
+const FAILURE_REASON_LABELS: Record<FailureReasonCode, string> = {
+  insufficient_funds: "Saldo insuficiente na carteira E-Mola ou M-Pesa",
+  invalid_number: "Número inválido ou não registado",
+  timeout: "Tempo de confirmação excedido",
+  cancelled: "Transação cancelada pelo utilizador",
+  network_error: "Falha de rede / conexão",
+  daily_limit: "Limite diário de transação atingido",
+  unknown_error: "Erro desconhecido",
+};
+
+const PENDING_REASON_LABELS: Record<PendingReasonCode, string> = {
+  awaiting_emola_confirmation: "Aguardando confirmação da E-Mola",
+  awaiting_mpesa_confirmation: "Aguardando confirmação da M-Pesa",
+  awaiting_customer_payment: "Aguardando pagamento do cliente",
+  processing: "Em processamento",
+  timeout: "Tempo de confirmação excedido",
+};
+
+export function classifyFailureReason(
+  message: string | null | undefined,
+  status?: "failed" | "expired",
+): { code: FailureReasonCode; label: string } {
+  const m = (message || "").toLowerCase();
+  if (status === "expired" || /(expir|timeout|timed?[\s_-]?out|tempo)/i.test(m)) {
+    return { code: "timeout", label: FAILURE_REASON_LABELS.timeout };
+  }
+  if (/(insufficient|saldo\s+insuficiente|sem\s+saldo|no\s+balance)/i.test(m)) {
+    return { code: "insufficient_funds", label: FAILURE_REASON_LABELS.insufficient_funds };
+  }
+  if (/(invalid[\s_-]?number|n(ú|u)mero\s+inv(á|a)lido|n(ã|a)o\s+registad|not[\s_-]?registered|invalid[\s_-]?msisdn)/i.test(m)) {
+    return { code: "invalid_number", label: FAILURE_REASON_LABELS.invalid_number };
+  }
+  if (/(cancel|recus|reject|declin|denied|did\s+not\s+enter\s+pin|pin\s+incorret)/i.test(m)) {
+    return { code: "cancelled", label: FAILURE_REASON_LABELS.cancelled };
+  }
+  if (/(network|conex(ã|a)o|connection|offline|unreachable|fetch\s+failed|abort)/i.test(m)) {
+    return { code: "network_error", label: FAILURE_REASON_LABELS.network_error };
+  }
+  if (/(daily[\s_-]?limit|limite\s+di(á|a)rio|limit\s+exceeded|exceeded[\s_-]?limit)/i.test(m)) {
+    return { code: "daily_limit", label: FAILURE_REASON_LABELS.daily_limit };
+  }
+  return { code: "unknown_error", label: FAILURE_REASON_LABELS.unknown_error };
+}
+
+export function pendingReasonForMethod(
+  method: string | null | undefined,
+  variant: "awaiting_customer" | "processing" | "timeout" = "awaiting_customer",
+): { code: PendingReasonCode; label: string } {
+  if (variant === "processing") {
+    return { code: "processing", label: PENDING_REASON_LABELS.processing };
+  }
+  if (variant === "timeout") {
+    return { code: "timeout", label: PENDING_REASON_LABELS.timeout };
+  }
+  const m = (method || "").toLowerCase();
+  if (m.includes("mpesa")) {
+    return { code: "awaiting_mpesa_confirmation", label: PENDING_REASON_LABELS.awaiting_mpesa_confirmation };
+  }
+  if (m.includes("emola")) {
+    return { code: "awaiting_emola_confirmation", label: PENDING_REASON_LABELS.awaiting_emola_confirmation };
+  }
+  return { code: "awaiting_customer_payment", label: PENDING_REASON_LABELS.awaiting_customer_payment };
+}
+
 async function fetchSaleById(saleId: string) {
   const { data, error } = await supabaseAdmin
     .from("sales")
