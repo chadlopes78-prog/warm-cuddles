@@ -313,6 +313,7 @@ function TransactionsPage() {
                 <TableHead>Recebido</TableHead>
                 <TableHead>Referência</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="min-w-[240px]">Justificativa</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
