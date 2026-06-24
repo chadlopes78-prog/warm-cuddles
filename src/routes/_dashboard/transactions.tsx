@@ -313,16 +313,17 @@ function TransactionsPage() {
                 <TableHead>Recebido</TableHead>
                 <TableHead>Referência</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="min-w-[240px]">Justificativa</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12">Carregando transações...</TableCell>
+                  <TableCell colSpan={9} className="text-center py-12">Carregando transações...</TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
                     Nenhuma transação encontrada.
                   </TableCell>
                 </TableRow>
@@ -361,17 +362,19 @@ function TransactionsPage() {
                         </code>
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-1 max-w-[220px]">
-                          <Badge variant="outline" className={info.className}>{info.label}</Badge>
-                          {sale.status_reason && info.label !== "Aprovado" ? (
-                            <span
-                              className="text-xs text-muted-foreground leading-tight"
-                              title={`Justificativa do status: ${sale.status_reason}`}
-                            >
-                              {sale.status_reason}
-                            </span>
-                          ) : null}
-                        </div>
+                        <Badge variant="outline" className={info.className}>{info.label}</Badge>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        {sale.status_reason && info.label !== "Aprovado" ? (
+                          <div
+                            className="text-xs leading-snug whitespace-normal break-words rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 max-w-[280px]"
+                            title={sale.status_reason}
+                          >
+                            {sale.status_reason}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
