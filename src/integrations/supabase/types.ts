@@ -536,6 +536,7 @@ export type Database = {
           payment_reference: string | null
           product_id: string | null
           status: string | null
+          status_reason: string | null
           traffic_page_id: string | null
           transaction_id: string | null
           user_id: string
@@ -553,6 +554,7 @@ export type Database = {
           payment_reference?: string | null
           product_id?: string | null
           status?: string | null
+          status_reason?: string | null
           traffic_page_id?: string | null
           transaction_id?: string | null
           user_id: string
@@ -570,6 +572,7 @@ export type Database = {
           payment_reference?: string | null
           product_id?: string | null
           status?: string | null
+          status_reason?: string | null
           traffic_page_id?: string | null
           transaction_id?: string | null
           user_id?: string

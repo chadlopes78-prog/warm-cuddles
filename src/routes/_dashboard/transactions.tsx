@@ -361,7 +361,17 @@ function TransactionsPage() {
                         </code>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={info.className}>{info.label}</Badge>
+                        <div className="flex flex-col gap-1 max-w-[220px]">
+                          <Badge variant="outline" className={info.className}>{info.label}</Badge>
+                          {sale.status_reason && info.label !== "Aprovado" ? (
+                            <span
+                              className="text-xs text-muted-foreground leading-tight"
+                              title={`Justificativa do status: ${sale.status_reason}`}
+                            >
+                              {sale.status_reason}
+                            </span>
+                          ) : null}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
