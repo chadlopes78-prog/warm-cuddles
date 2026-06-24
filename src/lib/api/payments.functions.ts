@@ -250,11 +250,16 @@ export const processPayment = createServerFn({ method: "POST" })
       normalizeGatewayStatus,
       paymentReferenceForSale,
       readGatewayTransactionId,
+      pendingReasonForMethod,
     } = await import("@/lib/payments/confirmation.server");
     const reference = paymentReferenceForSale(sale.id);
     const gatewayMethod = data.method === "mpesa" ? "mpesa_c2b" : "emola_c2b";
 
-    await supabaseAdmin.from("sales").update({ payment_reference: reference }).eq("id", sale.id);
+    const initialPendingReason = pendingReasonForMethod(gatewayMethod, "awaiting_customer").label;
+    await supabaseAdmin
+      .from("sales")
+      .update({ payment_reference: reference, status_reason: initialPendingReason })
+      .eq("id", sale.id);
 
     try {
       const controller = new AbortController();
