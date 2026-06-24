@@ -273,9 +273,10 @@ export async function confirmSalePayment(options: {
 }) {
   const { saleId, transactionId, reference, rawPayload, triggerPushcut = false } = options;
 
-  const updatePayload: { status: string; payment_reference: string; transaction_id?: string } = {
+  const updatePayload: { status: string; payment_reference: string; transaction_id?: string; status_reason: null } = {
     status: "paid",
     payment_reference: reference ? reference.slice(0, 200) : paymentReferenceForSale(saleId),
+    status_reason: null,
   };
   if (transactionId) updatePayload.transaction_id = transactionId.slice(0, 200);
 
