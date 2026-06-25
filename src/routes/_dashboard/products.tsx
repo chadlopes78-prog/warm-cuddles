@@ -69,6 +69,7 @@ function ProductsPage() {
   const [deliveryLink, setDeliveryLink] = useState("");
   const [accessLink, setAccessLink] = useState("");
   const [thankYouButtonText, setThankYouButtonText] = useState("Liberar acesso");
+  const [thankYouUrl, setThankYouUrl] = useState("");
   const [deliveryFile, setDeliveryFile] = useState<File | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string>("");
@@ -181,6 +182,7 @@ function ProductsPage() {
           delivery_file_url: deliveryFileUrl,
           access_link: accessLink || deliveryLink,
           thank_you_button_text: thankYouButtonText || "Liberar acesso",
+          thank_you_url: thankYouUrl || null,
           image_url: uploadedImageUrl || null,
           checkout_banner_url: uploadedBannerUrl || null,
           bump_enabled: bumpEnabled,
@@ -240,6 +242,7 @@ function ProductsPage() {
     setDeliveryLink("");
     setAccessLink("");
     setThankYouButtonText("Liberar acesso");
+    setThankYouUrl("");
     setDeliveryFile(null);
     setImageFile(null);
     setImageUrl("");
@@ -269,6 +272,7 @@ function ProductsPage() {
     setDeliveryLink(product.delivery_link || "");
     setAccessLink(product.access_link || "");
     setThankYouButtonText(product.thank_you_button_text || "Liberar acesso");
+    setThankYouUrl(product.thank_you_url || "");
     setImageUrl(product.image_url || "");
     setImageFile(null);
     setBannerUrl(product.checkout_banner_url || "");
@@ -315,6 +319,7 @@ function ProductsPage() {
           delivery_link: deliveryLink,
           access_link: accessLink || deliveryLink,
           thank_you_button_text: thankYouButtonText || "Liberar acesso",
+          thank_you_url: thankYouUrl || null,
           image_url: finalImageUrl || null,
           checkout_banner_url: finalBannerUrl || null,
           bump_enabled: bumpEnabled,
@@ -432,6 +437,18 @@ function ProductsPage() {
                           maxLength={40}
                         />
                         <p className="text-[10px] text-muted-foreground italic">Personalize o texto do botão verde mostrado após o pagamento.</p>
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="thank_you_url">Link da Página de Obrigado</Label>
+                        <Input
+                          id="thank_you_url"
+                          type="url"
+                          value={thankYouUrl}
+                          onChange={(e) => setThankYouUrl(e.target.value)}
+                          placeholder="https://seusite.com/obrigado"
+                        />
+                        <p className="text-[10px] text-muted-foreground italic">Após o pagamento aprovado, o cliente será redirecionado automaticamente para este link.</p>
                     </div>
                     
                     <div className="grid gap-2 pt-2 border-t border-dashed">
@@ -598,6 +615,18 @@ function ProductsPage() {
                           placeholder="Ex: Liberar acesso, Levantar valor, Aceder conteúdo"
                           maxLength={40}
                         />
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="edit-thank_you_url">Link da Página de Obrigado</Label>
+                        <Input
+                          id="edit-thank_you_url"
+                          type="url"
+                          value={thankYouUrl}
+                          onChange={(e) => setThankYouUrl(e.target.value)}
+                          placeholder="https://seusite.com/obrigado"
+                        />
+                        <p className="text-[10px] text-muted-foreground italic">Após o pagamento aprovado, o cliente será redirecionado automaticamente para este link.</p>
                     </div>
                     
                     <div className="grid gap-2 pt-2 border-t border-dashed">

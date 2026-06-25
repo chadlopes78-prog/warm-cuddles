@@ -30,7 +30,7 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
     const { data: sale, error } = await supabaseAdmin
       .from("sales")
       .select(
-        "id, status, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text)",
+        "id, status, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)",
       )
       .eq("id", data.saleId)
       .maybeSingle();
@@ -49,6 +49,7 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
       support_phone?: string | null;
       support_number?: string | null;
       thank_you_button_text?: string | null;
+      thank_you_url?: string | null;
     } | null;
 
     return {
@@ -60,6 +61,7 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
             support_phone: product.support_phone,
             support_number: product.support_number,
             thank_you_button_text: product.thank_you_button_text,
+            thank_you_url: isPaid ? product.thank_you_url : null,
           }
         : null,
     };

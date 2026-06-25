@@ -19,6 +19,7 @@ type SaleSuccessData = {
     support_phone?: string | null;
     support_number?: string | null;
     thank_you_button_text?: string | null;
+    thank_you_url?: string | null;
   } | null;
 };
 
@@ -31,7 +32,19 @@ function PaymentSuccessPage() {
   const { saleId } = Route.useSearch();
   const [data, setData] = useState<SaleSuccessData | null>(null);
   const [timedOut, setTimedOut] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const fetchPaymentData = useServerFn(getPaymentSuccessData);
+
+  // Auto-redirect to the seller's configured Thank You URL once paid.
+  useEffect(() => {
+    const url = data?.product?.thank_you_url?.trim();
+    const status = String(data?.sale?.status ?? "").toLowerCase();
+    const isPaid = ["paid", "approved", "success", "completed"].includes(status);
+    if (isPaid && url && !redirecting) {
+      setRedirecting(true);
+      window.location.replace(url);
+    }
+  }, [data, redirecting]);
 
   useEffect(() => {
     if (!saleId) return;
