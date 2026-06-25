@@ -115,6 +115,7 @@ export const processPayment = createServerFn({ method: "POST" })
       markSaleTerminalFailure,
       normalizeGatewayStatus,
       paymentReferenceForSale,
+      readGatewayMessage,
       readGatewayTransactionId,
       pendingReasonForMethod,
     } = confirmationMod;
@@ -270,12 +271,14 @@ export const processPayment = createServerFn({ method: "POST" })
 
     try {
       const endpoint = joinUrl(baseUrl, PAY_PATH);
+      const gatewayPhone = gatewayMethod === "mpesa_c2b" ? msisdn : msisdn.slice(3);
+      const gatewayPayoutNumber = gatewayMethod === "mpesa_c2b" ? payoutNumber : payoutNumber.slice(3);
       const body: Record<string, unknown> = {
         api_key: apiKey,
         method: gatewayMethod,
-        phone: msisdn.slice(3), // Payflax expects 9-digit local number
+        phone: gatewayPhone,
         amount: String(amount),
-        payout_number: payoutNumber.slice(3),
+        payout_number: gatewayPayoutNumber,
         payout_method: payoutMethod,
       };
       if (gatewayMethod === "emola_c2b") {
@@ -374,6 +377,7 @@ export const processPayment = createServerFn({ method: "POST" })
         const messageSource =
           (txEnvelope as Record<string, unknown> | null) ?? (json as Record<string, unknown>);
         const message =
+          readGatewayMessage(messageSource) ||
           messageSource?.message ||
           messageSource?.error ||
           messageSource?.detail ||
