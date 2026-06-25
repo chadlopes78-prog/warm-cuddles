@@ -125,6 +125,10 @@ function ProductsPage() {
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!thankYouUrl.trim() || !/^https?:\/\//i.test(thankYouUrl.trim())) {
+      toast.error("Link da Página de Obrigado é obrigatório (deve começar com http:// ou https://)");
+      return;
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser();
