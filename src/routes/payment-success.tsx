@@ -19,6 +19,7 @@ type SaleSuccessData = {
     support_phone?: string | null;
     support_number?: string | null;
     thank_you_button_text?: string | null;
+    thank_you_url?: string | null;
   } | null;
 };
 
