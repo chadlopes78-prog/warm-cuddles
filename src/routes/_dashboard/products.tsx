@@ -242,6 +242,7 @@ function ProductsPage() {
     setDeliveryLink("");
     setAccessLink("");
     setThankYouButtonText("Liberar acesso");
+    setThankYouUrl("");
     setDeliveryFile(null);
     setImageFile(null);
     setImageUrl("");
