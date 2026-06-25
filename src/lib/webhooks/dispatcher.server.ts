@@ -165,6 +165,7 @@ export async function deliverOnce(deliveryId: string): Promise<void> {
       eventType: delivery.event,
       paymentStatus,
       source: "webhook_deliveries",
+      amount: payload.amount as number | string | null | undefined,
     });
 
     await supabaseAdmin
