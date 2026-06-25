@@ -69,6 +69,7 @@ function ProductsPage() {
   const [deliveryLink, setDeliveryLink] = useState("");
   const [accessLink, setAccessLink] = useState("");
   const [thankYouButtonText, setThankYouButtonText] = useState("Liberar acesso");
+  const [thankYouUrl, setThankYouUrl] = useState("");
   const [deliveryFile, setDeliveryFile] = useState<File | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string>("");
