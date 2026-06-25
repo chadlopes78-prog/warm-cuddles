@@ -295,6 +295,10 @@ function ProductsPage() {
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
+    if (!thankYouUrl.trim() || !/^https?:\/\//i.test(thankYouUrl.trim())) {
+      toast.error("Link da Página de Obrigado é obrigatório (deve começar com http:// ou https://)");
+      return;
+    }
 
     try {
       let finalImageUrl = imageUrl;
