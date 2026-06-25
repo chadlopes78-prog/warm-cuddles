@@ -438,6 +438,18 @@ function ProductsPage() {
                         />
                         <p className="text-[10px] text-muted-foreground italic">Personalize o texto do botão verde mostrado após o pagamento.</p>
                     </div>
+
+                    <div className="grid gap-2">
+                        <Label htmlFor="thank_you_url">Link da Página de Obrigado</Label>
+                        <Input
+                          id="thank_you_url"
+                          type="url"
+                          value={thankYouUrl}
+                          onChange={(e) => setThankYouUrl(e.target.value)}
+                          placeholder="https://seusite.com/obrigado"
+                        />
+                        <p className="text-[10px] text-muted-foreground italic">Após o pagamento aprovado, o cliente será redirecionado automaticamente para este link.</p>
+                    </div>
                     
                     <div className="grid gap-2 pt-2 border-t border-dashed">
                         <Label className="text-xs">Entrega Automática (Opcional)</Label>
