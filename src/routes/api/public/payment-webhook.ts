@@ -71,6 +71,7 @@ export const Route = createFileRoute("/api/public/payment-webhook")({
             transactionId,
             reference,
             reason: String(payloadObject.message ?? payloadObject.error ?? status),
+            method: saleData.payment_method ?? null,
           });
         }
 
