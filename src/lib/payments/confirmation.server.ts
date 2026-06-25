@@ -364,10 +364,16 @@ export async function markSaleTerminalFailure(options: {
   transactionId?: string | null;
   reference?: string | null;
   reason?: string | null;
+  method?: string | null;
 }) {
-  const { saleId, status, transactionId, reference, reason } = options;
+  const { saleId, status, transactionId, reference, reason, method } = options;
   const finalStatus = status === "expired" ? "failed" : "failed";
-  const reasonInfo = classifyFailureReason(reason, status);
+  let resolvedMethod = method ?? null;
+  if (!resolvedMethod) {
+    const existing = await fetchSaleById(saleId);
+    resolvedMethod = existing?.payment_method ?? null;
+  }
+  const reasonInfo = classifyFailureReason(reason, status, resolvedMethod);
   const { data: updated, error } = await supabaseAdmin
     .from("sales")
     .update({
