@@ -125,6 +125,10 @@ function ProductsPage() {
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!thankYouUrl.trim() || !/^https?:\/\//i.test(thankYouUrl.trim())) {
+      toast.error("Link da Página de Obrigado é obrigatório (deve começar com http:// ou https://)");
+      return;
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -291,6 +295,10 @@ function ProductsPage() {
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
+    if (!thankYouUrl.trim() || !/^https?:\/\//i.test(thankYouUrl.trim())) {
+      toast.error("Link da Página de Obrigado é obrigatório (deve começar com http:// ou https://)");
+      return;
+    }
 
     try {
       let finalImageUrl = imageUrl;
@@ -440,15 +448,16 @@ function ProductsPage() {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="thank_you_url">Link da Página de Obrigado</Label>
+                        <Label htmlFor="thank_you_url">Link da Página de Obrigado <span className="text-red-500">*</span></Label>
                         <Input
                           id="thank_you_url"
                           type="url"
+                          required
                           value={thankYouUrl}
                           onChange={(e) => setThankYouUrl(e.target.value)}
                           placeholder="https://seusite.com/obrigado"
                         />
-                        <p className="text-[10px] text-muted-foreground italic">Após o pagamento aprovado, o cliente será redirecionado automaticamente para este link.</p>
+                        <p className="text-[10px] text-muted-foreground italic">Obrigatório. Após o pagamento aprovado, o cliente será redirecionado automaticamente para este link.</p>
                     </div>
                     
                     <div className="grid gap-2 pt-2 border-t border-dashed">
@@ -618,15 +627,16 @@ function ProductsPage() {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="edit-thank_you_url">Link da Página de Obrigado</Label>
+                        <Label htmlFor="edit-thank_you_url">Link da Página de Obrigado <span className="text-red-500">*</span></Label>
                         <Input
                           id="edit-thank_you_url"
                           type="url"
+                          required
                           value={thankYouUrl}
                           onChange={(e) => setThankYouUrl(e.target.value)}
                           placeholder="https://seusite.com/obrigado"
                         />
-                        <p className="text-[10px] text-muted-foreground italic">Após o pagamento aprovado, o cliente será redirecionado automaticamente para este link.</p>
+                        <p className="text-[10px] text-muted-foreground italic">Obrigatório. Após o pagamento aprovado, o cliente será redirecionado automaticamente para este link.</p>
                     </div>
                     
                     <div className="grid gap-2 pt-2 border-t border-dashed">
