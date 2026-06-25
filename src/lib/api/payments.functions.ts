@@ -269,9 +269,6 @@ export const processPayment = createServerFn({ method: "POST" })
     console.info("[perf] processPayment pre-gateway", { ms: Date.now() - t0, saleId: sale.id });
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90_000);
-
       const endpoint = joinUrl(baseUrl, PAY_PATH);
       const body: Record<string, unknown> = {
         api_key: apiKey,
@@ -285,18 +282,56 @@ export const processPayment = createServerFn({ method: "POST" })
         body.name = customerName.slice(0, 60);
       }
 
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          Accept: "application/json",
-          "User-Agent": "PagamentosMZ/1.0",
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      }).finally(() => clearTimeout(timeoutId));
+      // Retry on transient gateway errors (network/timeout/5xx).
+      // Up to 3 attempts with short backoff. PIN-bearing requests use
+      // a generous timeout so customers have time to confirm on the phone.
+      const MAX_ATTEMPTS = 3;
+      let res: Response | null = null;
+      let text = "";
+      let lastErr: unknown = null;
 
-      const text = await res.text();
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120_000);
+        try {
+          res = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json; charset=utf-8",
+              Accept: "application/json",
+              "User-Agent": "PagamentosMZ/1.0",
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
+          text = await res.text();
+          // Retry only on server-side faults; don't replay a 2xx/4xx (PIN already pushed).
+          if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
+            console.warn("[gateway] 5xx, retrying", { attempt, status: res.status });
+            await new Promise((r) => setTimeout(r, 400 * attempt));
+            continue;
+          }
+          break;
+        } catch (e) {
+          lastErr = e;
+          const aborted = (e as { name?: string })?.name === "AbortError";
+          console.warn("[gateway] network/timeout", {
+            attempt,
+            aborted,
+            err: (e as Error)?.message,
+          });
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise((r) => setTimeout(r, 400 * attempt));
+            continue;
+          }
+          throw e;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }
+
+      if (!res) throw lastErr ?? new Error("Gateway sem resposta");
+
       let json: Record<string, unknown> | null = null;
       try {
         json = text ? JSON.parse(text) : null;
@@ -311,6 +346,7 @@ export const processPayment = createServerFn({ method: "POST" })
         reference,
         body: text?.slice(0, 800),
       });
+
 
       // Payflax wraps result under `transacao`
       const txEnvelope =
