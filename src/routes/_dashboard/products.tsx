@@ -319,6 +319,7 @@ function ProductsPage() {
           delivery_link: deliveryLink,
           access_link: accessLink || deliveryLink,
           thank_you_button_text: thankYouButtonText || "Liberar acesso",
+          thank_you_url: thankYouUrl || null,
           image_url: finalImageUrl || null,
           checkout_banner_url: finalBannerUrl || null,
           bump_enabled: bumpEnabled,
