@@ -56,6 +56,7 @@ export function paymentReferenceForSale(saleId: string) {
 export function readGatewayTransactionId(input: unknown): string | null {
   const payload = asObject(input);
   const data = nestedObject(payload, "data");
+  const transacao = nestedObject(payload, "transacao");
   const value =
     payload.transaction_id ??
     payload.transactionId ??
@@ -67,6 +68,11 @@ export function readGatewayTransactionId(input: unknown): string | null {
     data.payment_id ??
     data.paymentId ??
     data.id ??
+    transacao.transaction_id ??
+    transacao.transactionId ??
+    transacao.payment_id ??
+    transacao.paymentId ??
+    transacao.id ??
     null;
   return value == null ? null : String(value);
 }
@@ -74,13 +80,20 @@ export function readGatewayTransactionId(input: unknown): string | null {
 export function readGatewayReference(input: unknown): string | null {
   const payload = asObject(input);
   const data = nestedObject(payload, "data");
+  const transacao = nestedObject(payload, "transacao");
   const value =
     payload.reference ??
     payload.external_reference ??
     payload.merchant_reference ??
+    payload.transaction_reference ??
     data.reference ??
     data.external_reference ??
     data.merchant_reference ??
+    data.transaction_reference ??
+    transacao.reference ??
+    transacao.external_reference ??
+    transacao.merchant_reference ??
+    transacao.transaction_reference ??
     null;
   return value == null ? null : String(value);
 }
@@ -124,6 +137,13 @@ export function readGatewayMessage(input: unknown): string | null {
 export function normalizeGatewayStatus(input: unknown, httpOk = true): NormalizedPaymentStatus {
   const payload = asObject(input);
   const data = nestedObject(payload, "data");
+  const transacao = nestedObject(payload, "transacao");
+  const provider = {
+    ...nestedObject(payload, "provider_response"),
+    ...nestedObject(data, "provider_response"),
+    ...nestedObject(transacao, "provider_response"),
+  };
+  const providerParsed = nestedObject(provider, "parsed");
   const successValue = payload.success ?? payload.ok ?? data.success ?? data.ok;
   const raw = String(
     payload.status ??
@@ -134,6 +154,10 @@ export function normalizeGatewayStatus(input: unknown, httpOk = true): Normalize
       data.payment_status ??
       data.state ??
       data.result ??
+      transacao.status ??
+      transacao.payment_status ??
+      transacao.state ??
+      transacao.result ??
       "",
   )
     .toLowerCase()
@@ -153,6 +177,16 @@ export function normalizeGatewayStatus(input: unknown, httpOk = true): Normalize
       data.message ??
       data.error ??
       data.detail ??
+      transacao.message ??
+      transacao.error ??
+      transacao.detail ??
+      provider.message ??
+      provider.error ??
+      provider.detail ??
+      provider.output_ResponseDesc ??
+      providerParsed.message ??
+      providerParsed.error_description ??
+      providerParsed.output_ResponseDesc ??
       "",
   ).toLowerCase();
   // Não marcar como "paid" apenas por success:true / mensagem "sucesso" —
