@@ -281,7 +281,19 @@ export function classifyFailureReason(
       label: withWallet("Número inválido para", wallet, "Número de telefone inválido"),
     };
   }
-  if (/(cancel|recus|reject|declin|denied|did\s+not\s+enter\s+pin|pin\s+incorret)/i.test(m)) {
+  // Telco/gateway returned "Customer did not enter PIN" (errorCode 11) —
+  // this is a PIN timeout on the customer's phone, NOT a deliberate cancel.
+  // Surface a clear, actionable message so users know to retry quickly.
+  if (/(did\s+not\s+enter\s+pin|pin\s+n(ã|a)o\s+(foi\s+)?(digitad|introduzid|inserid)|errorcode["']?\s*[:=]\s*["']?11\b|timeout.*pin|pin.*timeout)/i.test(m)) {
+    return {
+      code: "timeout",
+      label: "PIN não confirmado a tempo. Tente novamente e digite o PIN assim que receber a notificação.",
+    };
+  }
+  if (/(pin\s+incorret|wrong\s+pin|invalid\s+pin|pin\s+inv(á|a)lid)/i.test(m)) {
+    return { code: "cancelled", label: "PIN incorreto. Tente novamente." };
+  }
+  if (/(cancel|recus|reject|declin|denied)/i.test(m)) {
     return { code: "cancelled", label: "Transação cancelada pelo utilizador" };
   }
   if (/(service\s+unavailable|indispon(í|i)vel|temporariamente|maintenance|manuten(ç|c)(ã|a)o|503)/i.test(m)) {
