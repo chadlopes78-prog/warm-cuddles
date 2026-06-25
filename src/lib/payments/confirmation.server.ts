@@ -144,61 +144,100 @@ export function normalizeGatewayStatus(input: unknown, httpOk = true): Normalize
 export type FailureReasonCode =
   | "insufficient_funds"
   | "invalid_number"
+  | "account_not_registered"
   | "timeout"
   | "cancelled"
+  | "service_unavailable"
   | "network_error"
   | "daily_limit"
+  | "amount_limit"
+  | "internal_error"
   | "unknown_error";
 
 export type PendingReasonCode =
   | "awaiting_emola_confirmation"
   | "awaiting_mpesa_confirmation"
   | "awaiting_customer_payment"
+  | "payment_started"
   | "processing"
   | "timeout";
 
-const FAILURE_REASON_LABELS: Record<FailureReasonCode, string> = {
-  insufficient_funds: "Saldo insuficiente na carteira E-Mola ou M-Pesa",
-  invalid_number: "Número inválido ou não registado",
-  timeout: "Tempo de confirmação excedido",
-  cancelled: "Transação cancelada pelo utilizador",
-  network_error: "Falha de rede / conexão",
-  daily_limit: "Limite diário de transação atingido",
-  unknown_error: "Erro desconhecido",
-};
+function walletLabel(method: string | null | undefined): "E-Mola" | "M-Pesa" | null {
+  const m = (method || "").toLowerCase();
+  if (m.includes("mpesa")) return "M-Pesa";
+  if (m.includes("emola") || m.includes("e-mola") || m.includes("mola")) return "E-Mola";
+  return null;
+}
+
+function withWallet(prefix: string, wallet: "E-Mola" | "M-Pesa" | null, fallback: string) {
+  return wallet ? `${prefix} ${wallet}` : fallback;
+}
 
 const PENDING_REASON_LABELS: Record<PendingReasonCode, string> = {
-  awaiting_emola_confirmation: "Aguardando confirmação da E-Mola",
-  awaiting_mpesa_confirmation: "Aguardando confirmação da M-Pesa",
-  awaiting_customer_payment: "Aguardando pagamento do cliente",
-  processing: "Em processamento",
-  timeout: "Tempo de confirmação excedido",
+  awaiting_emola_confirmation: "Aguardando resposta da E-Mola",
+  awaiting_mpesa_confirmation: "Aguardando resposta da M-Pesa",
+  awaiting_customer_payment: "Aguardando confirmação do pagamento",
+  payment_started: "Pagamento iniciado mas ainda não confirmado",
+  processing: "Processamento em andamento",
+  timeout: "Tempo limite de confirmação excedido",
 };
 
 export function classifyFailureReason(
   message: string | null | undefined,
   status?: "failed" | "expired",
+  method?: string | null,
 ): { code: FailureReasonCode; label: string } {
   const m = (message || "").toLowerCase();
-  if (status === "expired" || /(expir|timeout|timed?[\s_-]?out|tempo)/i.test(m)) {
-    return { code: "timeout", label: FAILURE_REASON_LABELS.timeout };
+  const wallet = walletLabel(method);
+
+  if (status === "expired" || /(expir|timeout|timed?[\s_-]?out|tempo\s+limite|tempo\s+esgotad)/i.test(m)) {
+    return { code: "timeout", label: "Tempo limite de confirmação excedido" };
   }
-  if (/(insufficient|saldo\s+insuficiente|sem\s+saldo|no\s+balance)/i.test(m)) {
-    return { code: "insufficient_funds", label: FAILURE_REASON_LABELS.insufficient_funds };
+  if (/(insufficient|saldo\s+insuficiente|sem\s+saldo|no\s+balance|without\s+balance)/i.test(m)) {
+    return {
+      code: "insufficient_funds",
+      label: withWallet("Saldo insuficiente na carteira", wallet, "Saldo insuficiente na carteira"),
+    };
   }
-  if (/(invalid[\s_-]?number|n(ú|u)mero\s+inv(á|a)lido|n(ã|a)o\s+registad|not[\s_-]?registered|invalid[\s_-]?msisdn)/i.test(m)) {
-    return { code: "invalid_number", label: FAILURE_REASON_LABELS.invalid_number };
+  if (/(not[\s_-]?registered|n(ã|a)o\s+registad|account[\s_-]?not[\s_-]?found|conta\s+n(ã|a)o)/i.test(m)) {
+    return {
+      code: "account_not_registered",
+      label: withWallet("Conta não registada na", wallet, "Conta de pagamento não registada"),
+    };
+  }
+  if (/(invalid[\s_-]?number|n(ú|u)mero\s+inv(á|a)lido|invalid[\s_-]?msisdn|n(ú|u)mero\s+incorret)/i.test(m)) {
+    return {
+      code: "invalid_number",
+      label: withWallet("Número inválido para", wallet, "Número de telefone inválido"),
+    };
   }
   if (/(cancel|recus|reject|declin|denied|did\s+not\s+enter\s+pin|pin\s+incorret)/i.test(m)) {
-    return { code: "cancelled", label: FAILURE_REASON_LABELS.cancelled };
+    return { code: "cancelled", label: "Transação cancelada pelo utilizador" };
   }
-  if (/(network|conex(ã|a)o|connection|offline|unreachable|fetch\s+failed|abort)/i.test(m)) {
-    return { code: "network_error", label: FAILURE_REASON_LABELS.network_error };
+  if (/(service\s+unavailable|indispon(í|i)vel|temporariamente|maintenance|manuten(ç|c)(ã|a)o|503)/i.test(m)) {
+    return {
+      code: "service_unavailable",
+      label: withWallet("Serviço temporariamente indisponível:", wallet, "Serviço de pagamento temporariamente indisponível"),
+    };
   }
-  if (/(daily[\s_-]?limit|limite\s+di(á|a)rio|limit\s+exceeded|exceeded[\s_-]?limit)/i.test(m)) {
-    return { code: "daily_limit", label: FAILURE_REASON_LABELS.daily_limit };
+  if (/(network|conex(ã|a)o|connection|offline|unreachable|fetch\s+failed|abort|comunica(ç|c)(ã|a)o|operadora)/i.test(m)) {
+    return { code: "network_error", label: "Falha de comunicação com a operadora" };
   }
-  return { code: "unknown_error", label: FAILURE_REASON_LABELS.unknown_error };
+  if (/(daily[\s_-]?limit|limite\s+di(á|a)rio)/i.test(m)) {
+    return { code: "daily_limit", label: "Limite diário de transações atingido" };
+  }
+  if (/(amount[\s_-]?limit|valor\s+acima|exceeds?\s+limit|limit\s+exceeded|maximum\s+amount)/i.test(m)) {
+    return { code: "amount_limit", label: "Valor da transação acima do limite permitido" };
+  }
+  if (/(internal[\s_-]?error|erro\s+interno|server\s+error|500)/i.test(m)) {
+    return { code: "internal_error", label: "Erro interno do sistema" };
+  }
+  // Transparency: surface the raw gateway message when present and reasonable.
+  const trimmed = (message || "").trim();
+  if (trimmed.length > 0 && trimmed.length <= 200) {
+    return { code: "unknown_error", label: trimmed };
+  }
+  return { code: "unknown_error", label: "Erro desconhecido no processamento" };
 }
 
 export function pendingReasonForMethod(
