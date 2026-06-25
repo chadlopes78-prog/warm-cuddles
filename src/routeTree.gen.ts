@@ -29,6 +29,7 @@ import { Route as DashboardCustomersRouteImport } from './routes/_dashboard/cust
 import { Route as ApiPublicPaymentWebhookRouteImport } from './routes/api/public/payment-webhook'
 import { Route as DashboardReportsTrafficRouteImport } from './routes/_dashboard.reports.traffic'
 import { Route as ApiPublicHooksProcessWebhookQueueRouteImport } from './routes/api/public/hooks/process-webhook-queue'
+import { Route as ApiPublicHooksDailyPaymentSummaryRouteImport } from './routes/api/public/hooks/daily-payment-summary'
 
 const WaitingApprovalRoute = WaitingApprovalRouteImport.update({
   id: '/waiting-approval',
@@ -130,6 +131,12 @@ const ApiPublicHooksProcessWebhookQueueRoute =
     path: '/api/public/hooks/process-webhook-queue',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksDailyPaymentSummaryRoute =
+  ApiPublicHooksDailyPaymentSummaryRouteImport.update({
+    id: '/api/public/hooks/daily-payment-summary',
+    path: '/api/public/hooks/daily-payment-summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -150,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/p/$productId': typeof PProductIdRoute
   '/reports/traffic': typeof DashboardReportsTrafficRoute
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
+  '/api/public/hooks/daily-payment-summary': typeof ApiPublicHooksDailyPaymentSummaryRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
 }
 export interface FileRoutesByTo {
@@ -171,6 +179,7 @@ export interface FileRoutesByTo {
   '/p/$productId': typeof PProductIdRoute
   '/reports/traffic': typeof DashboardReportsTrafficRoute
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
+  '/api/public/hooks/daily-payment-summary': typeof ApiPublicHooksDailyPaymentSummaryRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
 }
 export interface FileRoutesById {
@@ -194,6 +203,7 @@ export interface FileRoutesById {
   '/p/$productId': typeof PProductIdRoute
   '/_dashboard/reports/traffic': typeof DashboardReportsTrafficRoute
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
+  '/api/public/hooks/daily-payment-summary': typeof ApiPublicHooksDailyPaymentSummaryRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
 }
 export interface FileRouteTypes {
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/p/$productId'
     | '/reports/traffic'
     | '/api/public/payment-webhook'
+    | '/api/public/hooks/daily-payment-summary'
     | '/api/public/hooks/process-webhook-queue'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/p/$productId'
     | '/reports/traffic'
     | '/api/public/payment-webhook'
+    | '/api/public/hooks/daily-payment-summary'
     | '/api/public/hooks/process-webhook-queue'
   id:
     | '__root__'
@@ -260,6 +272,7 @@ export interface FileRouteTypes {
     | '/p/$productId'
     | '/_dashboard/reports/traffic'
     | '/api/public/payment-webhook'
+    | '/api/public/hooks/daily-payment-summary'
     | '/api/public/hooks/process-webhook-queue'
   fileRoutesById: FileRoutesById
 }
@@ -274,6 +287,7 @@ export interface RootRouteChildren {
   WaitingApprovalRoute: typeof WaitingApprovalRoute
   PProductIdRoute: typeof PProductIdRoute
   ApiPublicPaymentWebhookRoute: typeof ApiPublicPaymentWebhookRoute
+  ApiPublicHooksDailyPaymentSummaryRoute: typeof ApiPublicHooksDailyPaymentSummaryRoute
   ApiPublicHooksProcessWebhookQueueRoute: typeof ApiPublicHooksProcessWebhookQueueRoute
 }
 
@@ -419,6 +433,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksProcessWebhookQueueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/daily-payment-summary': {
+      id: '/api/public/hooks/daily-payment-summary'
+      path: '/api/public/hooks/daily-payment-summary'
+      fullPath: '/api/public/hooks/daily-payment-summary'
+      preLoaderRoute: typeof ApiPublicHooksDailyPaymentSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -461,6 +482,8 @@ const rootRouteChildren: RootRouteChildren = {
   WaitingApprovalRoute: WaitingApprovalRoute,
   PProductIdRoute: PProductIdRoute,
   ApiPublicPaymentWebhookRoute: ApiPublicPaymentWebhookRoute,
+  ApiPublicHooksDailyPaymentSummaryRoute:
+    ApiPublicHooksDailyPaymentSummaryRoute,
   ApiPublicHooksProcessWebhookQueueRoute:
     ApiPublicHooksProcessWebhookQueueRoute,
 }

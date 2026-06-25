@@ -798,6 +798,15 @@ export type Database = {
         Args: { p_end_date: string; p_start_date: string }
         Returns: Json
       }
+      get_payment_failure_summary: {
+        Args: { _since: string; _user_id: string }
+        Returns: {
+          failure_count: number
+          payment_method: string
+          status_reason: string
+          total_amount: number
+        }[]
+      }
       is_product_publicly_visible: {
         Args: { _product_id: string }
         Returns: boolean
