@@ -627,15 +627,16 @@ function ProductsPage() {
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="edit-thank_you_url">Link da Página de Obrigado</Label>
+                        <Label htmlFor="edit-thank_you_url">Link da Página de Obrigado <span className="text-red-500">*</span></Label>
                         <Input
                           id="edit-thank_you_url"
                           type="url"
+                          required
                           value={thankYouUrl}
                           onChange={(e) => setThankYouUrl(e.target.value)}
                           placeholder="https://seusite.com/obrigado"
                         />
-                        <p className="text-[10px] text-muted-foreground italic">Após o pagamento aprovado, o cliente será redirecionado automaticamente para este link.</p>
+                        <p className="text-[10px] text-muted-foreground italic">Obrigatório. Após o pagamento aprovado, o cliente será redirecionado automaticamente para este link.</p>
                     </div>
                     
                     <div className="grid gap-2 pt-2 border-t border-dashed">
