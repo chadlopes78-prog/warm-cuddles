@@ -8,7 +8,27 @@ type SendPushcutOnceOptions = {
   eventType?: string;
   paymentStatus?: string;
   source: string;
+  amount?: number | string | null;
 };
+
+const GATEWAY_FEE_PERCENT = 0.15;
+const GATEWAY_FEE_FIXED = 15;
+
+function toNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number(value.replace(",", "."));
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+export function computeNetAmount(gross: unknown): number {
+  const g = toNumber(gross);
+  if (g <= 0) return 0;
+  const net = g - g * GATEWAY_FEE_PERCENT - GATEWAY_FEE_FIXED;
+  return Math.max(0, Math.round(net * 100) / 100);
+}
 
 export function readPushcutOrderId(payload: Record<string, unknown>): string | null {
   const value = payload.orderId ?? payload.order_id ?? payload.sale_id ?? payload.saleId;
