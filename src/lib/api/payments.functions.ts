@@ -341,6 +341,7 @@ export const processPayment = createServerFn({ method: "POST" })
           transactionId: transactionId ? String(transactionId) : null,
           reference,
           reason: String(message),
+          method: gatewayMethod,
         });
         return { success: false, saleId: sale.id, error: String(message) };
       } else {
