@@ -103,7 +103,21 @@ export const processPayment = createServerFn({ method: "POST" })
       return { success: false, error: "Gateway de pagamento não configurado no servidor." };
     }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const t0 = Date.now();
+
+    // Parallel: import admin client + confirmation helpers up-front
+    const [{ supabaseAdmin }, confirmationMod] = await Promise.all([
+      import("@/integrations/supabase/client.server"),
+      import("@/lib/payments/confirmation.server"),
+    ]);
+    const {
+      confirmSalePayment,
+      markSaleTerminalFailure,
+      normalizeGatewayStatus,
+      paymentReferenceForSale,
+      readGatewayTransactionId,
+      pendingReasonForMethod,
+    } = confirmationMod;
 
     const isUuid =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -137,29 +151,35 @@ export const processPayment = createServerFn({ method: "POST" })
       return { success: false, error: "Valor do produto inválido." };
     }
 
-    // Platform-wide payout wallets (fallback when seller has none configured)
     const PLATFORM_PAYOUT = {
       mpesa: "258847842046",
       emola: "258863006821",
     };
 
-    // Fetch the seller's payout configuration (per-method)
-    const { data: ownerProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("payout_number, payout_method, payout_mpesa, payout_emola")
-      .eq("id", product.user_id)
-      .maybeSingle();
+    // Parallel: owner payout config + traffic page lookup (independent)
+    const [ownerRes, trafficRes] = await Promise.all([
+      supabaseAdmin
+        .from("profiles")
+        .select("payout_number, payout_method, payout_mpesa, payout_emola")
+        .eq("id", product.user_id)
+        .maybeSingle(),
+      data.trafficPageTrackingId
+        ? supabaseAdmin
+            .from("traffic_pages")
+            .select("id")
+            .eq("tracking_id", data.trafficPageTrackingId)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
 
-    const op = ownerProfile as {
+    const op = ownerRes.data as {
       payout_number?: string | null;
       payout_method?: string | null;
       payout_mpesa?: string | null;
       payout_emola?: string | null;
     } | null;
 
-    // Select payout number based on customer's chosen method
     const methodSpecific = data.method === "mpesa" ? op?.payout_mpesa : op?.payout_emola;
-    // Fallback to legacy single field if it matches the method
     const legacyMatches =
       (data.method === "mpesa" && op?.payout_method === "mpesa_b2c") ||
       (data.method === "emola" && op?.payout_method === "emola_b2c");
@@ -180,19 +200,19 @@ export const processPayment = createServerFn({ method: "POST" })
       ? `${data.customerName.trim()} (contacto: ${data.contactPhone.trim()})`
       : data.customerName.trim();
 
-    let finalTrafficPageId: string | null = null;
-    if (data.trafficPageTrackingId) {
-      const { data: pageData } = await supabaseAdmin
-        .from("traffic_pages")
-        .select("id")
-        .eq("tracking_id", data.trafficPageTrackingId)
-        .maybeSingle();
-      finalTrafficPageId = pageData?.id ?? null;
-    }
+    const finalTrafficPageId = (trafficRes as { data: { id?: string } | null }).data?.id ?? null;
+
+    // Pre-generate sale ID so reference + status_reason go in the initial INSERT
+    // (saves a follow-up UPDATE round-trip before the gateway call).
+    const saleId = crypto.randomUUID();
+    const gatewayMethod = data.method === "mpesa" ? "mpesa_c2b" : "emola_c2b";
+    const reference = paymentReferenceForSale(saleId);
+    const initialPendingReason = pendingReasonForMethod(gatewayMethod, "awaiting_customer").label;
 
     const { data: sale, error: saleError } = await supabaseAdmin
       .from("sales")
       .insert({
+        id: saleId,
         product_id: product.id,
         user_id: product.user_id,
         customer_name: customerName.slice(0, 100),
@@ -203,6 +223,8 @@ export const processPayment = createServerFn({ method: "POST" })
         traffic_page_id: finalTrafficPageId,
         bump_accepted: bumpEligible,
         bump_amount: bumpEligible ? bumpAmount : null,
+        payment_reference: reference,
+        status_reason: initialPendingReason,
       } as any)
       .select("id")
       .single();
@@ -212,11 +234,8 @@ export const processPayment = createServerFn({ method: "POST" })
       return { success: false, error: "Não foi possível registar a venda." };
     }
 
-    // Webhook eventos pre-payment (fire-and-forget)
+    // Fire-and-forget webhooks pre-payment
     {
-      const { enqueueWebhookEvent, processPendingForUser } = await import(
-        "@/lib/webhooks/dispatcher.server"
-      );
       const basePayload = {
         sale_id: sale.id,
         product_id: product.id,
@@ -228,6 +247,9 @@ export const processPayment = createServerFn({ method: "POST" })
         created_at: new Date().toISOString(),
       };
       void (async () => {
+        const { enqueueWebhookEvent, processPendingForUser } = await import(
+          "@/lib/webhooks/dispatcher.server"
+        );
         await enqueueWebhookEvent({
           userId: product.user_id,
           event: "sale.created",
@@ -244,22 +266,7 @@ export const processPayment = createServerFn({ method: "POST" })
       })().catch((e) => console.error("[webhooks] enqueue pre-payment err", e));
     }
 
-    const {
-      confirmSalePayment,
-      markSaleTerminalFailure,
-      normalizeGatewayStatus,
-      paymentReferenceForSale,
-      readGatewayTransactionId,
-      pendingReasonForMethod,
-    } = await import("@/lib/payments/confirmation.server");
-    const reference = paymentReferenceForSale(sale.id);
-    const gatewayMethod = data.method === "mpesa" ? "mpesa_c2b" : "emola_c2b";
-
-    const initialPendingReason = pendingReasonForMethod(gatewayMethod, "awaiting_customer").label;
-    await supabaseAdmin
-      .from("sales")
-      .update({ payment_reference: reference, status_reason: initialPendingReason })
-      .eq("id", sale.id);
+    console.info("[perf] processPayment pre-gateway", { ms: Date.now() - t0, saleId: sale.id });
 
     try {
       const controller = new AbortController();
