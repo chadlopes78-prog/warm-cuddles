@@ -134,7 +134,14 @@ export async function sendPushcutOnce({
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event: "sale_approved", orderId }),
+      body: JSON.stringify({
+        event: "sale_approved",
+        orderId,
+        value: netAmount,
+        amount: netAmount,
+        gross_amount: grossAmount,
+        net_amount: netAmount,
+      }),
       signal: controller.signal,
     }).finally(() => clearTimeout(timeout));
 
