@@ -29,6 +29,7 @@ export const Route = createFileRoute("/api/public/payment-webhook")({
           findSaleForGatewayEvent,
           markSaleTerminalFailure,
           normalizeGatewayStatus,
+          readGatewayMessage,
           readGatewayReference,
           readGatewayTransactionId,
         } = await import("@/lib/payments/confirmation.server");
@@ -70,7 +71,7 @@ export const Route = createFileRoute("/api/public/payment-webhook")({
             status,
             transactionId,
             reference,
-            reason: String(payloadObject.message ?? payloadObject.error ?? status),
+            reason: readGatewayMessage(payload) ?? String(payloadObject.message ?? payloadObject.error ?? status),
             method: saleData.payment_method ?? null,
           });
         }

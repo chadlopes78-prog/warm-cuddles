@@ -85,6 +85,42 @@ export function readGatewayReference(input: unknown): string | null {
   return value == null ? null : String(value);
 }
 
+export function readGatewayMessage(input: unknown): string | null {
+  const payload = asObject(input);
+  const data = nestedObject(payload, "data");
+  const transacao = nestedObject(payload, "transacao");
+  const provider = {
+    ...nestedObject(payload, "provider_response"),
+    ...nestedObject(data, "provider_response"),
+    ...nestedObject(transacao, "provider_response"),
+  };
+  const providerParsed = nestedObject(provider, "parsed");
+  const value =
+    payload.message ??
+    payload.error ??
+    payload.detail ??
+    payload.output_ResponseDesc ??
+    data.message ??
+    data.error ??
+    data.detail ??
+    data.output_ResponseDesc ??
+    transacao.message ??
+    transacao.error ??
+    transacao.detail ??
+    transacao.output_ResponseDesc ??
+    provider.message ??
+    provider.error ??
+    provider.detail ??
+    provider.output_ResponseDesc ??
+    providerParsed.message ??
+    providerParsed.error_description ??
+    providerParsed.output_ResponseDesc ??
+    null;
+  if (value == null) return null;
+  const text = String(value).trim();
+  return text.length > 0 ? text : null;
+}
+
 export function normalizeGatewayStatus(input: unknown, httpOk = true): NormalizedPaymentStatus {
   const payload = asObject(input);
   const data = nestedObject(payload, "data");
@@ -205,7 +241,7 @@ export function classifyFailureReason(
       label: withWallet("Conta não registada na", wallet, "Conta de pagamento não registada"),
     };
   }
-  if (/(invalid[\s_-]?number|n(ú|u)mero\s+inv(á|a)lido|invalid[\s_-]?msisdn|n(ú|u)mero\s+incorret)/i.test(m)) {
+  if (/(invalid[\s_-]?number|n(ú|u)mero\s+inv(á|a)lido|invalid[\s_-]?msisdn|msisdn\s+invalid|n(ú|u)mero\s+incorret)/i.test(m)) {
     return {
       code: "invalid_number",
       label: withWallet("Número inválido para", wallet, "Número de telefone inválido"),
