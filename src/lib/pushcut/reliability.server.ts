@@ -47,8 +47,11 @@ export async function sendPushcutOnce({
   eventType = "sale.approved",
   paymentStatus = "paid",
   source,
+  amount,
 }: SendPushcutOnceOptions): Promise<{ sent: boolean; duplicate: boolean; blocked: boolean }> {
   const allowed = eventType === "sale.approved" && isPaidStatusForPushcut(paymentStatus);
+  const grossAmount = toNumber(amount);
+  const netAmount = computeNetAmount(amount);
 
   console.log("[pushcut] trigger attempt", {
     orderId,
