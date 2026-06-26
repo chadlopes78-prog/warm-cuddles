@@ -336,6 +336,36 @@ export const processPayment = createServerFn({ method: "POST" })
       let lastErr: unknown = null;
 
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        // First e-Mola attempt: reuse the in-flight request started
+        // in parallel with the sale INSERT — the PIN was already pushed
+        // to the customer's device while the DB write was happening.
+        if (attempt === 1 && earlyGatewayPromise) {
+          try {
+            res = await earlyGatewayPromise;
+            text = await res.text();
+            if (earlyTimeoutId) clearTimeout(earlyTimeoutId);
+            if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
+              console.warn("[gateway] 5xx, retrying", { attempt, status: res.status });
+              await new Promise((r) => setTimeout(r, 400 * attempt));
+              continue;
+            }
+            break;
+          } catch (e) {
+            if (earlyTimeoutId) clearTimeout(earlyTimeoutId);
+            lastErr = e;
+            const aborted = (e as { name?: string })?.name === "AbortError";
+            console.warn("[gateway] early emola network/timeout", {
+              aborted,
+              err: (e as Error)?.message,
+            });
+            if (attempt < MAX_ATTEMPTS) {
+              await new Promise((r) => setTimeout(r, 400 * attempt));
+              continue;
+            }
+            throw e;
+          }
+        }
+
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 120_000);
         try {
