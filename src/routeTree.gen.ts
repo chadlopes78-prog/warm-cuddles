@@ -28,6 +28,7 @@ import { Route as DashboardDashboardRouteImport } from './routes/_dashboard/dash
 import { Route as DashboardCustomersRouteImport } from './routes/_dashboard/customers'
 import { Route as ApiPublicPaymentWebhookRouteImport } from './routes/api/public/payment-webhook'
 import { Route as DashboardReportsTrafficRouteImport } from './routes/_dashboard.reports.traffic'
+import { Route as ApiPublicHooksReconcilePendingPaymentsRouteImport } from './routes/api/public/hooks/reconcile-pending-payments'
 import { Route as ApiPublicHooksProcessWebhookQueueRouteImport } from './routes/api/public/hooks/process-webhook-queue'
 import { Route as ApiPublicHooksDailyPaymentSummaryRouteImport } from './routes/api/public/hooks/daily-payment-summary'
 
@@ -125,6 +126,12 @@ const DashboardReportsTrafficRoute = DashboardReportsTrafficRouteImport.update({
   path: '/reports/traffic',
   getParentRoute: () => DashboardRoute,
 } as any)
+const ApiPublicHooksReconcilePendingPaymentsRoute =
+  ApiPublicHooksReconcilePendingPaymentsRouteImport.update({
+    id: '/api/public/hooks/reconcile-pending-payments',
+    path: '/api/public/hooks/reconcile-pending-payments',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksProcessWebhookQueueRoute =
   ApiPublicHooksProcessWebhookQueueRouteImport.update({
     id: '/api/public/hooks/process-webhook-queue',
@@ -159,6 +166,7 @@ export interface FileRoutesByFullPath {
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
   '/api/public/hooks/daily-payment-summary': typeof ApiPublicHooksDailyPaymentSummaryRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
+  '/api/public/hooks/reconcile-pending-payments': typeof ApiPublicHooksReconcilePendingPaymentsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -181,6 +189,7 @@ export interface FileRoutesByTo {
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
   '/api/public/hooks/daily-payment-summary': typeof ApiPublicHooksDailyPaymentSummaryRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
+  '/api/public/hooks/reconcile-pending-payments': typeof ApiPublicHooksReconcilePendingPaymentsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -205,6 +214,7 @@ export interface FileRoutesById {
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
   '/api/public/hooks/daily-payment-summary': typeof ApiPublicHooksDailyPaymentSummaryRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
+  '/api/public/hooks/reconcile-pending-payments': typeof ApiPublicHooksReconcilePendingPaymentsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -229,6 +239,7 @@ export interface FileRouteTypes {
     | '/api/public/payment-webhook'
     | '/api/public/hooks/daily-payment-summary'
     | '/api/public/hooks/process-webhook-queue'
+    | '/api/public/hooks/reconcile-pending-payments'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -251,6 +262,7 @@ export interface FileRouteTypes {
     | '/api/public/payment-webhook'
     | '/api/public/hooks/daily-payment-summary'
     | '/api/public/hooks/process-webhook-queue'
+    | '/api/public/hooks/reconcile-pending-payments'
   id:
     | '__root__'
     | '/'
@@ -274,6 +286,7 @@ export interface FileRouteTypes {
     | '/api/public/payment-webhook'
     | '/api/public/hooks/daily-payment-summary'
     | '/api/public/hooks/process-webhook-queue'
+    | '/api/public/hooks/reconcile-pending-payments'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -289,6 +302,7 @@ export interface RootRouteChildren {
   ApiPublicPaymentWebhookRoute: typeof ApiPublicPaymentWebhookRoute
   ApiPublicHooksDailyPaymentSummaryRoute: typeof ApiPublicHooksDailyPaymentSummaryRoute
   ApiPublicHooksProcessWebhookQueueRoute: typeof ApiPublicHooksProcessWebhookQueueRoute
+  ApiPublicHooksReconcilePendingPaymentsRoute: typeof ApiPublicHooksReconcilePendingPaymentsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -426,6 +440,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardReportsTrafficRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/api/public/hooks/reconcile-pending-payments': {
+      id: '/api/public/hooks/reconcile-pending-payments'
+      path: '/api/public/hooks/reconcile-pending-payments'
+      fullPath: '/api/public/hooks/reconcile-pending-payments'
+      preLoaderRoute: typeof ApiPublicHooksReconcilePendingPaymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/process-webhook-queue': {
       id: '/api/public/hooks/process-webhook-queue'
       path: '/api/public/hooks/process-webhook-queue'
@@ -486,6 +507,8 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicHooksDailyPaymentSummaryRoute,
   ApiPublicHooksProcessWebhookQueueRoute:
     ApiPublicHooksProcessWebhookQueueRoute,
+  ApiPublicHooksReconcilePendingPaymentsRoute:
+    ApiPublicHooksReconcilePendingPaymentsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
