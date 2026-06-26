@@ -211,6 +211,29 @@ export const processPayment = createServerFn({ method: "POST" })
     const gatewayMethod = data.method === "mpesa" ? "mpesa_c2b" : "emola_c2b";
     const reference = paymentReferenceForSale(saleId);
     const initialPendingReason = pendingReasonForMethod(gatewayMethod, "awaiting_customer").label;
+    const reqId = saleId.slice(0, 8);
+
+    // Idempotency: if the same customer just initiated a payment for the same
+    // product+amount in the last 30s and it is still pending, return that sale
+    // instead of creating a duplicate (prevents double-charges from rage-clicks).
+    {
+      const cutoff = new Date(Date.now() - 30_000).toISOString();
+      const { data: dup } = await supabaseAdmin
+        .from("sales")
+        .select("id, status, transaction_id")
+        .eq("product_id", product.id)
+        .eq("customer_phone", msisdn)
+        .eq("amount", amount)
+        .eq("status", "pending")
+        .gte("created_at", cutoff)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (dup?.id) {
+        console.info("[payments] idempotent replay", { reqId, saleId: dup.id });
+        return { success: true, saleId: dup.id, transactionId: dup.transaction_id ?? null };
+      }
+    }
 
     const saleInsertPromise = supabaseAdmin
       .from("sales")
@@ -255,17 +278,20 @@ export const processPayment = createServerFn({ method: "POST" })
       };
       earlyController = new AbortController();
       earlyTimeoutId = setTimeout(() => earlyController?.abort(), 120_000);
+      console.info("[payments] emola early-fire", { reqId, saleId });
       earlyGatewayPromise = fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json; charset=utf-8",
           Accept: "application/json",
           "User-Agent": "PagamentosMZ/1.0",
+          "X-Request-Id": reqId,
         },
         body: JSON.stringify(body),
         signal: earlyController.signal,
       });
     }
+
 
     const { data: sale, error: saleError } = await saleInsertPromise;
 
