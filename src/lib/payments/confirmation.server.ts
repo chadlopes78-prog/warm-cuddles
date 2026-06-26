@@ -467,7 +467,7 @@ export async function markSaleTerminalFailure(options: {
   if (reference) updatePayload.payment_reference = reference.slice(0, 200);
   const { data: updated, error } = await supabaseAdmin
     .from("sales")
-    .update(updatePayload)
+    .update(updatePayload as any)
     .eq("id", saleId)
     .neq("status", "paid")
     .neq("status", "failed")
