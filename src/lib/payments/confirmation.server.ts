@@ -456,18 +456,18 @@ export async function markSaleTerminalFailure(options: {
     resolvedMethod = existing?.payment_method ?? null;
   }
   const reasonInfo = classifyFailureReason(reason, status, resolvedMethod);
+  // Only set payment_reference when a real gateway reference is supplied.
+  // Never fall back to the human-readable reason — it's not unique and
+  // collides with `sales_payment_reference_unique` across stale rows.
+  const updatePayload: Record<string, unknown> = {
+    status: finalStatus,
+    status_reason: reasonInfo.label,
+  };
+  if (transactionId) updatePayload.transaction_id = transactionId.slice(0, 200);
+  if (reference) updatePayload.payment_reference = reference.slice(0, 200);
   const { data: updated, error } = await supabaseAdmin
     .from("sales")
-    .update({
-      status: finalStatus,
-      status_reason: reasonInfo.label,
-      transaction_id: transactionId ? transactionId.slice(0, 200) : undefined,
-      payment_reference: reference
-        ? reference.slice(0, 200)
-        : reason
-          ? reason.slice(0, 200)
-          : undefined,
-    })
+    .update(updatePayload as any)
     .eq("id", saleId)
     .neq("status", "paid")
     .neq("status", "failed")
