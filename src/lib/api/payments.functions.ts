@@ -212,7 +212,7 @@ export const processPayment = createServerFn({ method: "POST" })
     const reference = paymentReferenceForSale(saleId);
     const initialPendingReason = pendingReasonForMethod(gatewayMethod, "awaiting_customer").label;
 
-    const { data: sale, error: saleError } = await supabaseAdmin
+    const saleInsertPromise = supabaseAdmin
       .from("sales")
       .insert({
         id: saleId,
@@ -232,7 +232,47 @@ export const processPayment = createServerFn({ method: "POST" })
       .select("id")
       .single();
 
+    // e-Mola: fire the gateway request IN PARALLEL with the sale INSERT.
+    // The gateway only needs phone/amount/name (saleId is internal), so we
+    // remove a DB round-trip from the critical path before the PIN prompt.
+    // M-Pesa keeps the original sequential flow (insert -> gateway) intact
+    // per requirement: do not alter M-Pesa behaviour.
+    let earlyGatewayPromise: Promise<Response> | null = null;
+    let earlyController: AbortController | null = null;
+    let earlyTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    if (data.method === "emola") {
+      const endpoint = joinUrl(baseUrl, PAY_PATH);
+      const gatewayPhone = msisdn.slice(3);
+      const gatewayPayoutNumber = payoutNumber.slice(3);
+      const body: Record<string, unknown> = {
+        api_key: apiKey,
+        method: "emola_c2b",
+        phone: gatewayPhone,
+        amount: String(amount),
+        payout_number: gatewayPayoutNumber,
+        payout_method: payoutMethod,
+        name: customerName.slice(0, 60),
+      };
+      earlyController = new AbortController();
+      earlyTimeoutId = setTimeout(() => earlyController?.abort(), 120_000);
+      earlyGatewayPromise = fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          Accept: "application/json",
+          "User-Agent": "PagamentosMZ/1.0",
+        },
+        body: JSON.stringify(body),
+        signal: earlyController.signal,
+      });
+    }
+
+    const { data: sale, error: saleError } = await saleInsertPromise;
+
     if (saleError || !sale) {
+      // Abort the in-flight gateway request if the row could not be persisted.
+      if (earlyController) earlyController.abort();
+      if (earlyTimeoutId) clearTimeout(earlyTimeoutId);
       console.error("sale insert error", saleError);
       return { success: false, error: "Não foi possível registar a venda." };
     }
