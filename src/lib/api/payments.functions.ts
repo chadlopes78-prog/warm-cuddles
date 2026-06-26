@@ -255,42 +255,49 @@ export const processPayment = createServerFn({ method: "POST" })
       .select("id")
       .single();
 
-    // e-Mola: fire the gateway request IN PARALLEL with the sale INSERT.
-    // The gateway only needs phone/amount/name (saleId is internal), so we
-    // remove a DB round-trip from the critical path before the PIN prompt.
-    // M-Pesa keeps the original sequential flow (insert -> gateway) intact
-    // per requirement: do not alter M-Pesa behaviour.
-    let earlyGatewayPromise: Promise<Response> | null = null;
-    let earlyController: AbortController | null = null;
-    let earlyTimeoutId: ReturnType<typeof setTimeout> | null = null;
-    if (data.method === "emola") {
-      const endpoint = joinUrl(baseUrl, PAY_PATH);
-      const gatewayPhone = msisdn.slice(3);
-      const gatewayPayoutNumber = payoutNumber.slice(3);
-      const body: Record<string, unknown> = {
-        api_key: apiKey,
-        method: "emola_c2b",
-        phone: gatewayPhone,
-        amount: String(amount),
-        payout_number: gatewayPayoutNumber,
-        payout_method: payoutMethod,
-        name: customerName.slice(0, 60),
-      };
-      earlyController = new AbortController();
-      earlyTimeoutId = setTimeout(() => earlyController?.abort(), 120_000);
-      console.info("[payments] emola early-fire", { reqId, saleId });
-      earlyGatewayPromise = fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          Accept: "application/json",
-          "User-Agent": "PagamentosMZ/1.0",
-          "X-Request-Id": reqId,
-        },
-        body: JSON.stringify(body),
-        signal: earlyController.signal,
-      });
-    }
+    // Early-fire: dispatch gateway request IN PARALLEL with sale INSERT for
+    // BOTH M-Pesa and e-Mola. Gateway needs only phone/amount (saleId is
+    // internal), so we remove a DB round-trip from the critical path before
+    // the PIN prompt arrives on the customer's device. Keep-alive + idempotency
+    // header avoid TCP/TLS handshake cost on warm workers and let the gateway
+    // dedupe duplicated submissions.
+    const endpoint = joinUrl(baseUrl, PAY_PATH);
+    const gatewayPhone = data.method === "mpesa" ? msisdn : msisdn.slice(3);
+    const gatewayPayoutNumber = data.method === "mpesa" ? payoutNumber : payoutNumber.slice(3);
+    const earlyBody: Record<string, unknown> = {
+      api_key: apiKey,
+      method: gatewayMethod,
+      phone: gatewayPhone,
+      amount: String(amount),
+      payout_number: gatewayPayoutNumber,
+      payout_method: payoutMethod,
+    };
+    if (gatewayMethod === "emola_c2b") earlyBody.name = customerName.slice(0, 60);
+
+    const earlyController: AbortController = new AbortController();
+    const earlyTimeoutId: ReturnType<typeof setTimeout> = setTimeout(
+      () => earlyController.abort(),
+      120_000,
+    );
+    const tGwSent = Date.now();
+    console.info("[perf] gateway early-fire", {
+      reqId, saleId, method: gatewayMethod, sinceStartMs: tGwSent - t0,
+    });
+    const earlyGatewayPromise: Promise<Response> = fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        Accept: "application/json",
+        Connection: "keep-alive",
+        "User-Agent": "PagamentosMZ/1.0",
+        "X-Request-Id": reqId,
+        "X-Idempotency-Key": saleId,
+      },
+      body: JSON.stringify(earlyBody),
+      signal: earlyController.signal,
+      keepalive: true,
+    });
+
 
 
     const { data: sale, error: saleError } = await saleInsertPromise;
@@ -338,21 +345,6 @@ export const processPayment = createServerFn({ method: "POST" })
     console.info("[perf] processPayment pre-gateway", { ms: Date.now() - t0, saleId: sale.id });
 
     try {
-      const endpoint = joinUrl(baseUrl, PAY_PATH);
-      const gatewayPhone = gatewayMethod === "mpesa_c2b" ? msisdn : msisdn.slice(3);
-      const gatewayPayoutNumber = gatewayMethod === "mpesa_c2b" ? payoutNumber : payoutNumber.slice(3);
-      const body: Record<string, unknown> = {
-        api_key: apiKey,
-        method: gatewayMethod,
-        phone: gatewayPhone,
-        amount: String(amount),
-        payout_number: gatewayPayoutNumber,
-        payout_method: payoutMethod,
-      };
-      if (gatewayMethod === "emola_c2b") {
-        body.name = customerName.slice(0, 60);
-      }
-
       // Retry on transient gateway errors (network/timeout/5xx).
       // Up to 3 attempts with short backoff. PIN-bearing requests use
       // a generous timeout so customers have time to confirm on the phone.
@@ -362,14 +354,18 @@ export const processPayment = createServerFn({ method: "POST" })
       let lastErr: unknown = null;
 
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        // First e-Mola attempt: reuse the in-flight request started
-        // in parallel with the sale INSERT — the PIN was already pushed
-        // to the customer's device while the DB write was happening.
-        if (attempt === 1 && earlyGatewayPromise) {
+        // First attempt: reuse the in-flight early-fire request started in
+        // parallel with the sale INSERT (both methods). The PIN has already
+        // been pushed to the customer while the DB write was happening.
+        if (attempt === 1) {
           try {
             res = await earlyGatewayPromise;
             text = await res.text();
-            if (earlyTimeoutId) clearTimeout(earlyTimeoutId);
+            clearTimeout(earlyTimeoutId);
+            console.info("[perf] gateway responded", {
+              reqId, saleId: sale.id, status: res.status,
+              gatewayMs: Date.now() - tGwSent, totalMs: Date.now() - t0,
+            });
             if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
               console.warn("[gateway] 5xx, retrying", { attempt, status: res.status });
               await new Promise((r) => setTimeout(r, 400 * attempt));
@@ -377,12 +373,11 @@ export const processPayment = createServerFn({ method: "POST" })
             }
             break;
           } catch (e) {
-            if (earlyTimeoutId) clearTimeout(earlyTimeoutId);
+            clearTimeout(earlyTimeoutId);
             lastErr = e;
             const aborted = (e as { name?: string })?.name === "AbortError";
-            console.warn("[gateway] early emola network/timeout", {
-              aborted,
-              err: (e as Error)?.message,
+            console.warn("[gateway] early-fire network/timeout", {
+              reqId, aborted, err: (e as Error)?.message,
             });
             if (attempt < MAX_ATTEMPTS) {
               await new Promise((r) => setTimeout(r, 400 * attempt));
@@ -394,18 +389,26 @@ export const processPayment = createServerFn({ method: "POST" })
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 120_000);
+        const tRetry = Date.now();
         try {
           res = await fetch(endpoint, {
             method: "POST",
             headers: {
               "Content-Type": "application/json; charset=utf-8",
               Accept: "application/json",
+              Connection: "keep-alive",
               "User-Agent": "PagamentosMZ/1.0",
+              "X-Request-Id": reqId,
+              "X-Idempotency-Key": saleId,
             },
-            body: JSON.stringify(body),
+            body: JSON.stringify(earlyBody),
             signal: controller.signal,
+            keepalive: true,
           });
           text = await res.text();
+          console.info("[perf] gateway retry responded", {
+            reqId, attempt, status: res.status, ms: Date.now() - tRetry,
+          });
           // Retry only on server-side faults; don't replay a 2xx/4xx (PIN already pushed).
           if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
             console.warn("[gateway] 5xx, retrying", { attempt, status: res.status });
@@ -417,9 +420,7 @@ export const processPayment = createServerFn({ method: "POST" })
           lastErr = e;
           const aborted = (e as { name?: string })?.name === "AbortError";
           console.warn("[gateway] network/timeout", {
-            attempt,
-            aborted,
-            err: (e as Error)?.message,
+            reqId, attempt, aborted, err: (e as Error)?.message,
           });
           if (attempt < MAX_ATTEMPTS) {
             await new Promise((r) => setTimeout(r, 400 * attempt));
@@ -441,12 +442,15 @@ export const processPayment = createServerFn({ method: "POST" })
       }
 
       console.info("payflax response", {
+        reqId,
         status: res.status,
         method: gatewayMethod,
         endpoint,
         reference,
         body: text?.slice(0, 800),
       });
+
+
 
 
       // Payflax wraps result under `transacao`
