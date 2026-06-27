@@ -154,6 +154,8 @@ function configuredWebhookUrl() {
     try {
       const u = new URL(clean);
       if (/\/api\/public\/payment-webhook$/i.test(u.pathname)) return appendSecret(clean);
+      u.pathname = `${u.pathname.replace(/\/+$/, "")}/api/public/payment-webhook`;
+      return appendSecret(u.toString());
     } catch {
       // Fall back to appending the webhook path below.
     }
