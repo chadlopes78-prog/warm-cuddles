@@ -20,7 +20,8 @@ import {
   Zap,
   AlertCircle,
   Loader2,
-  Receipt
+  Receipt,
+  PieChart
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
