@@ -133,7 +133,7 @@ function configuredPublicUrl() {
   return raw ? raw.replace(/\/+$/, "") : "";
 }
 
-function configuredWebhookUrl() {
+function configuredWebhookUrl(requestOrigin = "") {
   const explicit = process.env.PAYMENT_WEBHOOK_URL || process.env.PAYMENT_CALLBACK_URL || "";
   const secret = process.env.PAYMENT_WEBHOOK_SECRET || "";
   const appendSecret = (url: string) => {
@@ -163,7 +163,8 @@ function configuredWebhookUrl() {
   }
 
   const publicUrl = configuredPublicUrl();
-  return publicUrl ? appendSecret(`${publicUrl}/api/public/payment-webhook`) : "";
+  const origin = publicUrl || requestOrigin.replace(/\/+$/, "");
+  return origin ? appendSecret(`${origin}/api/public/payment-webhook`) : "";
 }
 
 export const processPayment = createServerFn({ method: "POST" })
@@ -211,6 +212,14 @@ export const processPayment = createServerFn({ method: "POST" })
       readGatewayTransactionId,
       pendingReasonForMethod,
     } = confirmationMod;
+
+    let requestOrigin = "";
+    try {
+      const { getRequestUrl } = await import("@tanstack/react-start/server");
+      requestOrigin = getRequestUrl({ xForwardedHost: true, xForwardedProto: true }).origin;
+    } catch {
+      requestOrigin = "";
+    }
 
     const isUuid =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -365,7 +374,7 @@ export const processPayment = createServerFn({ method: "POST" })
       payout_method: payoutMethod,
       transaction_reference: reference,
     };
-    const callbackUrl = configuredWebhookUrl();
+    const callbackUrl = configuredWebhookUrl(requestOrigin);
     if (callbackUrl) earlyBody.callback_url = callbackUrl;
     if (gatewayMethod === "emola_c2b") earlyBody.name = customerName.slice(0, 60);
 
@@ -546,7 +555,9 @@ export const processPayment = createServerFn({ method: "POST" })
     if (raceResult.kind === "timeout") {
       // Detach: finish gateway handling in background, return success now.
       console.info("[perf] client wait elapsed; detaching gateway", { reqId, saleId: sale.id });
-      void processGatewayResult(earlyGatewayPromise);
+      const bgTask = processGatewayResult(earlyGatewayPromise);
+      const { waitUntil } = await import("@/lib/runtime/wait-until.server");
+      if (!waitUntil(bgTask)) void bgTask;
       return { success: true, saleId: sale.id, transactionId: null };
     }
 
