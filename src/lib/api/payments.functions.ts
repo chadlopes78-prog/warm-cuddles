@@ -54,9 +54,7 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let { data: sale, error } = await supabaseAdmin
       .from("sales")
-      .select(
-        "id, status, status_reason, created_at, payment_method, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)",
-      )
+      .select(PAYMENT_SUCCESS_SELECT)
       .eq("id", data.saleId)
       .maybeSingle();
 
@@ -67,8 +65,17 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
     if (!sale) return { sale: null, product: null };
 
     const currentStatus = String(sale.status ?? "").toLowerCase();
+    if (currentStatus === "pending") {
+      const reconciled = await reconcileCheckoutSaleWithGateway(sale).catch((e) => {
+        console.error("[checkout] gateway reconciliation failed", e);
+        return null;
+      });
+      if (reconciled) sale = reconciled;
+    }
+
+    const statusAfterReconcile = String(sale.status ?? "").toLowerCase();
     const pendingAgeMs = sale.created_at ? Date.now() - new Date(sale.created_at).getTime() : 0;
-    if (currentStatus === "pending" && pendingAgeMs > 6 * 60_000) {
+    if (statusAfterReconcile === "pending" && pendingAgeMs > 6 * 60_000) {
       const { markSaleTerminalFailure } = await import("@/lib/payments/confirmation.server");
       await markSaleTerminalFailure({
         saleId: sale.id,
@@ -79,9 +86,7 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
 
       const refreshed = await supabaseAdmin
         .from("sales")
-        .select(
-          "id, status, status_reason, created_at, payment_method, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)",
-        )
+        .select(PAYMENT_SUCCESS_SELECT)
         .eq("id", data.saleId)
         .maybeSingle();
       if (!refreshed.error && refreshed.data) sale = refreshed.data;
