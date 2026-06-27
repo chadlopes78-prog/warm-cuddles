@@ -304,23 +304,15 @@ function MethodCard({
   );
 }
 
-          <Stat label="Transações" value={String(data.count)} />
-          <Stat label="Ticket médio" value={fmt(data.avg)} icon={<TrendingUp className="h-3 w-3" />} />
-          <Stat label="% do total" value={`${data.pct.toFixed(1)}%`} icon={<Percent className="h-3 w-3" />} />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 function Stat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
     <div>
-      <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+      <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         {icon}
         {label}
       </p>
-      <p className="mt-1 truncate text-sm font-bold text-slate-900">{value}</p>
+      <p className="mt-1 truncate text-sm font-bold text-foreground">{value}</p>
     </div>
   );
 }
+
