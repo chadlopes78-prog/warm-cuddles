@@ -432,18 +432,52 @@ function CheckoutPage() {
             </div>
 
             {/* Status / error */}
-            {(paymentStatusMessage || paymentErrorMessage) && (
-              <div
-                className={cn(
-                  "rounded-xl border p-3 text-xs font-medium",
-                  paymentErrorMessage
-                    ? "border-red-200 bg-red-50 text-red-700"
-                    : "border-emerald-200 bg-emerald-50 text-emerald-700",
+            {paymentErrorMessage ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-2">
+                <div className="flex items-start gap-2">
+                  <ShieldAlert className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-red-800 leading-snug">
+                      {paymentErrorCode === "insufficient_balance"
+                        ? "Saldo insuficiente na carteira"
+                        : paymentErrorCode === "cancelled"
+                          ? "Pagamento cancelado"
+                          : paymentErrorCode === "timeout"
+                            ? "PIN não confirmado a tempo"
+                            : paymentErrorCode === "invalid_phone" ||
+                                paymentErrorCode === "method_mismatch"
+                              ? "Número inválido"
+                              : "Pagamento não concluído"}
+                    </p>
+                    <p className="text-[11px] font-medium text-red-700 leading-snug mt-0.5">
+                      {paymentErrorCode === "insufficient_balance"
+                        ? "Recarrega a tua carteira e clica em Tentar novamente."
+                        : paymentErrorCode === "cancelled"
+                          ? "Cancelaste a confirmação. Podes tentar de novo agora."
+                          : paymentErrorCode === "timeout"
+                            ? "Tenta novamente e digita o PIN assim que receberes a notificação."
+                            : paymentErrorMessage}
+                    </p>
+                  </div>
+                </div>
+                {paymentRetryable && (
+                  <button
+                    type="button"
+                    onClick={() => void submitPayment()}
+                    disabled={processingPayment}
+                    className="w-full h-10 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 disabled:opacity-60 transition"
+                  >
+                    {processingPayment ? "A enviar..." : "Tentar novamente"}
+                  </button>
                 )}
-              >
-                {paymentErrorMessage || paymentStatusMessage}
               </div>
-            )}
+            ) : paymentStatusMessage ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-700">
+                {paymentStatusMessage}
+              </div>
+            ) : null}
+
+
 
             {/* Order Bump */}
             {product.bump_enabled && product.bump_price && Number(product.bump_price) > 0 && (
