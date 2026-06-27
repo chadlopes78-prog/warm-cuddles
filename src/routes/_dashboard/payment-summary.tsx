@@ -226,13 +226,16 @@ function PaymentSummaryPage() {
 
             <Card className="rounded-2xl border-slate-100 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-base font-bold">Faturamento Total</CardTitle>
+                <CardTitle className="text-base font-bold">Faturamento Líquido</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-3xl font-black tracking-tight text-slate-900">{fmt(summary.grand)}</p>
                   <p className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-400">
-                    {summary.mpesa.count + summary.emola.count} transações confirmadas
+                    {summary.mpesa.count + summary.emola.count} transações · bruto {fmt(summary.grandGross)}
+                  </p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                    Já descontado 15% + 15 MT por venda
                   </p>
                 </div>
                 <div className="space-y-2 border-t border-slate-100 pt-3">
@@ -241,6 +244,7 @@ function PaymentSummaryPage() {
                 </div>
               </CardContent>
             </Card>
+
           </div>
         </>
       )}
