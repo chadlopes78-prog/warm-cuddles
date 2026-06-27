@@ -19,6 +19,9 @@ const PaymentSuccessInput = z.object({
   saleId: z.string().uuid(),
 });
 
+const PAYMENT_SUCCESS_SELECT =
+  "id, status, status_reason, created_at, payment_method, amount, customer_phone, transaction_id, payment_reference, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)";
+
 export type PaymentErrorCode =
   | "invalid_phone"
   | "method_mismatch"
