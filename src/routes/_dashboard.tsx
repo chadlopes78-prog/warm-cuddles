@@ -21,7 +21,8 @@ import {
   AlertCircle,
   Loader2,
   Receipt,
-  PieChart
+  PieChart,
+  MessageCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
