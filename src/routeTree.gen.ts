@@ -10,8 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WaitingApprovalRouteImport } from './routes/waiting-approval'
-import { Route as SuccessRouteImport } from './routes/success'
-import { Route as PaymentSuccessRouteImport } from './routes/payment-success'
 import { Route as BlockedRouteImport } from './routes/blocked'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -36,16 +34,6 @@ import { Route as ApiPublicHooksDailyPaymentSummaryRouteImport } from './routes/
 const WaitingApprovalRoute = WaitingApprovalRouteImport.update({
   id: '/waiting-approval',
   path: '/waiting-approval',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SuccessRoute = SuccessRouteImport.update({
-  id: '/success',
-  path: '/success',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PaymentSuccessRoute = PaymentSuccessRouteImport.update({
-  id: '/payment-success',
-  path: '/payment-success',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BlockedRoute = BlockedRouteImport.update({
@@ -156,8 +144,6 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/blocked': typeof BlockedRoute
-  '/payment-success': typeof PaymentSuccessRoute
-  '/success': typeof SuccessRoute
   '/waiting-approval': typeof WaitingApprovalRoute
   '/customers': typeof DashboardCustomersRoute
   '/dashboard': typeof DashboardDashboardRoute
@@ -180,8 +166,6 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/blocked': typeof BlockedRoute
-  '/payment-success': typeof PaymentSuccessRoute
-  '/success': typeof SuccessRoute
   '/waiting-approval': typeof WaitingApprovalRoute
   '/customers': typeof DashboardCustomersRoute
   '/dashboard': typeof DashboardDashboardRoute
@@ -206,8 +190,6 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/blocked': typeof BlockedRoute
-  '/payment-success': typeof PaymentSuccessRoute
-  '/success': typeof SuccessRoute
   '/waiting-approval': typeof WaitingApprovalRoute
   '/_dashboard/customers': typeof DashboardCustomersRoute
   '/_dashboard/dashboard': typeof DashboardDashboardRoute
@@ -232,8 +214,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/blocked'
-    | '/payment-success'
-    | '/success'
     | '/waiting-approval'
     | '/customers'
     | '/dashboard'
@@ -256,8 +236,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/blocked'
-    | '/payment-success'
-    | '/success'
     | '/waiting-approval'
     | '/customers'
     | '/dashboard'
@@ -281,8 +259,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/blocked'
-    | '/payment-success'
-    | '/success'
     | '/waiting-approval'
     | '/_dashboard/customers'
     | '/_dashboard/dashboard'
@@ -307,8 +283,6 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
   BlockedRoute: typeof BlockedRoute
-  PaymentSuccessRoute: typeof PaymentSuccessRoute
-  SuccessRoute: typeof SuccessRoute
   WaitingApprovalRoute: typeof WaitingApprovalRoute
   PProductIdRoute: typeof PProductIdRoute
   ApiPublicPaymentWebhookRoute: typeof ApiPublicPaymentWebhookRoute
@@ -324,20 +298,6 @@ declare module '@tanstack/react-router' {
       path: '/waiting-approval'
       fullPath: '/waiting-approval'
       preLoaderRoute: typeof WaitingApprovalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/success': {
-      id: '/success'
-      path: '/success'
-      fullPath: '/success'
-      preLoaderRoute: typeof SuccessRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/payment-success': {
-      id: '/payment-success'
-      path: '/payment-success'
-      fullPath: '/payment-success'
-      preLoaderRoute: typeof PaymentSuccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/blocked': {
@@ -519,8 +479,6 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
   BlockedRoute: BlockedRoute,
-  PaymentSuccessRoute: PaymentSuccessRoute,
-  SuccessRoute: SuccessRoute,
   WaitingApprovalRoute: WaitingApprovalRoute,
   PProductIdRoute: PProductIdRoute,
   ApiPublicPaymentWebhookRoute: ApiPublicPaymentWebhookRoute,
