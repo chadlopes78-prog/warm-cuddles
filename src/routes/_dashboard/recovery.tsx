@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { MessageSquare, MessageCircle, CheckCircle2, Clock, TrendingUp, Search, Trash2 } from "lucide-react";
+import { MessageSquare, MessageCircle, CheckCircle2, Clock, TrendingUp, Search, Trash2, Send } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -66,6 +66,7 @@ type RecoveryItem = {
   lastAttemptAt: string;
   status: "pending" | "expired" | "recovered";
   recoveredAt: string | null;
+  contactSent: boolean;
 };
 
 function normalizePhone(raw: string): string {
@@ -100,6 +101,7 @@ function RecoveryPage() {
   const [customTo, setCustomTo] = useState<string>("");
   const [resetAt, setResetAt] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
+  const [sendingBulk, setSendingBulk] = useState(false);
   const logAttempt = useServerFn(logRecoveryAttempt);
   const resetHistory = useServerFn(resetRecoveryHistory);
 
@@ -226,6 +228,7 @@ function RecoveryPage() {
         lastAttemptAt: reference.created_at,
         status,
         recoveredAt,
+        contactSent: Boolean(attemptAt),
       });
     }
     out.sort((a, b) => +new Date(b.lastAttemptAt) - +new Date(a.lastAttemptAt));
@@ -305,6 +308,46 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
   };
 
+  const pendingToSend = useMemo(
+    () => periodItems.filter((i) => i.status === "pending" && !i.contactSent),
+    [periodItems],
+  );
+
+  const handleSendAll = async () => {
+    if (sendingBulk) return;
+    const targets = pendingToSend;
+    if (targets.length === 0) {
+      toast.info("Nenhum checkout pendente para contactar.");
+      return;
+    }
+    setSendingBulk(true);
+    let sent = 0;
+    let failed = 0;
+    toast.info(`Enviando ${targets.length} mensagem(ns)... mantenha esta aba aberta.`);
+    for (const item of targets) {
+      try {
+        const url = buildWhatsAppLink(item);
+        const win = window.open(url, "_blank", "noopener,noreferrer");
+        if (!win) {
+          failed++;
+          toast.error("O navegador bloqueou novas abas. Permita pop-ups para esta página.");
+          break;
+        }
+        await logAttempt({
+          data: { productId: item.productId, customerPhone: item.customerPhone },
+        });
+        sent++;
+        await new Promise((r) => setTimeout(r, 600));
+      } catch {
+        failed++;
+      }
+    }
+    await refetchAttempts();
+    setSendingBulk(false);
+    if (sent > 0) toast.success(`${sent} mensagem(ns) enviada(s). Clientes marcados como "Contato Enviado".`);
+    if (failed > 0 && sent === 0) toast.error("Não foi possível enviar as mensagens.");
+  };
+
   const periodLabel =
     period === "today" ? "Hoje" :
     period === "7d" ? "Últimos 7 dias" :
@@ -336,6 +379,15 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
               <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="w-[150px]" />
             </>
           )}
+          <Button
+            size="sm"
+            onClick={handleSendAll}
+            disabled={sendingBulk || pendingToSend.length === 0}
+            className="bg-[#25D366] hover:bg-[#1DAE54] text-white"
+          >
+            <Send className="h-4 w-4 mr-1.5" />
+            {sendingBulk ? "Enviando..." : `Enviar para Todos os Pendentes${pendingToSend.length ? ` (${pendingToSend.length})` : ""}`}
+          </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" disabled={resetting}>
@@ -423,7 +475,7 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{timeAgo(item.lastAttemptAt)}</TableCell>
                       <TableCell>
-                        <StatusBadge status={item.status} />
+                        <StatusBadge status={item.status} contactSent={item.contactSent} />
                       </TableCell>
                       <TableCell className="text-right">
                         {item.status === "recovered" ? (
@@ -499,10 +551,12 @@ function StatCard({
   );
 }
 
-function StatusBadge({ status }: { status: RecoveryItem["status"] }) {
+function StatusBadge({ status, contactSent }: { status: RecoveryItem["status"]; contactSent?: boolean }) {
   if (status === "recovered")
     return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Recuperado</Badge>;
   if (status === "expired")
     return <Badge className="bg-slate-200 text-slate-700 hover:bg-slate-200">Expirado</Badge>;
+  if (contactSent)
+    return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Contato Enviado</Badge>;
   return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Pendente</Badge>;
 }
