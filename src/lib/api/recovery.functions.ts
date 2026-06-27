@@ -15,3 +15,13 @@ export const logRecoveryAttempt = createServerFn({ method: "POST" })
     if (error) throw error;
     return { ok: true };
   });
+
+export const resetRecoveryHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { error } = await (context.supabase.from as any)("recovery_attempts")
+      .delete()
+      .eq("user_id", context.userId);
+    if (error) throw error;
+    return { ok: true, resetAt: new Date().toISOString() };
+  });
