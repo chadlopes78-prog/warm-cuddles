@@ -75,32 +75,40 @@ function PaymentSummaryPage() {
 
   const summary = useMemo(() => {
     const acc = {
-      mpesa: { total: 0, count: 0 },
-      emola: { total: 0, count: 0 },
+      mpesa: { gross: 0, net: 0, count: 0 },
+      emola: { gross: 0, net: 0, count: 0 },
     };
     for (const s of sales) {
       if (!SUCCESS.has((s.status || "").toLowerCase())) continue;
       const m = methodOf(s.payment_method);
       if (m === "other") continue;
       const amt = Number(s.amount || 0) + Number(s.bump_amount || 0);
-      acc[m].total += amt;
+      const net = Math.max(0, amt - amt * 0.15 - 15);
+      acc[m].gross += amt;
+      acc[m].net += net;
       acc[m].count += 1;
     }
-    const grand = acc.mpesa.total + acc.emola.total;
+    const grandNet = acc.mpesa.net + acc.emola.net;
     return {
       mpesa: {
-        ...acc.mpesa,
-        avg: acc.mpesa.count ? acc.mpesa.total / acc.mpesa.count : 0,
-        pct: grand ? (acc.mpesa.total / grand) * 100 : 0,
+        total: acc.mpesa.net,
+        gross: acc.mpesa.gross,
+        count: acc.mpesa.count,
+        avg: acc.mpesa.count ? acc.mpesa.net / acc.mpesa.count : 0,
+        pct: grandNet ? (acc.mpesa.net / grandNet) * 100 : 0,
       },
       emola: {
-        ...acc.emola,
-        avg: acc.emola.count ? acc.emola.total / acc.emola.count : 0,
-        pct: grand ? (acc.emola.total / grand) * 100 : 0,
+        total: acc.emola.net,
+        gross: acc.emola.gross,
+        count: acc.emola.count,
+        avg: acc.emola.count ? acc.emola.net / acc.emola.count : 0,
+        pct: grandNet ? (acc.emola.net / grandNet) * 100 : 0,
       },
-      grand,
+      grand: grandNet,
+      grandGross: acc.mpesa.gross + acc.emola.gross,
     };
   }, [sales]);
+
 
   const pieData = useMemo(
     () =>
@@ -218,13 +226,16 @@ function PaymentSummaryPage() {
 
             <Card className="rounded-2xl border-slate-100 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-base font-bold">Faturamento Total</CardTitle>
+                <CardTitle className="text-base font-bold">Faturamento Líquido</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <p className="text-3xl font-black tracking-tight text-slate-900">{fmt(summary.grand)}</p>
                   <p className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-400">
-                    {summary.mpesa.count + summary.emola.count} transações confirmadas
+                    {summary.mpesa.count + summary.emola.count} transações · bruto {fmt(summary.grandGross)}
+                  </p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                    Já descontado 15% + 15 MT por venda
                   </p>
                 </div>
                 <div className="space-y-2 border-t border-slate-100 pt-3">
@@ -233,6 +244,7 @@ function PaymentSummaryPage() {
                 </div>
               </CardContent>
             </Card>
+
           </div>
         </>
       )}
@@ -274,7 +286,7 @@ function MethodCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Total confirmado</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Total líquido</p>
           <p className="text-2xl font-black tracking-tight text-slate-900">{fmt(data.total)}</p>
         </div>
         <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-2">
