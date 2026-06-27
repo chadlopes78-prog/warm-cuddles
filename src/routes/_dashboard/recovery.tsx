@@ -101,6 +101,7 @@ function RecoveryPage() {
   const [customTo, setCustomTo] = useState<string>("");
   const [resetAt, setResetAt] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
+  const [sendingBulk, setSendingBulk] = useState(false);
   const logAttempt = useServerFn(logRecoveryAttempt);
   const resetHistory = useServerFn(resetRecoveryHistory);
 
