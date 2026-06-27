@@ -35,7 +35,13 @@ export const Route = createFileRoute("/p/$productId")({
   },
   head: ({ loaderData }) => {
     const product = loaderData?.product;
-    if (!product) return {};
+    const baseLinks = [
+      // Warm TCP+TLS to the payment gateway BEFORE the user clicks "Pagar".
+      // Removes ~150–400 ms of handshake from the critical path on first click.
+      { rel: "preconnect", href: "https://payflax.site", crossOrigin: "" },
+      { rel: "dns-prefetch", href: "https://payflax.site" },
+    ];
+    if (!product) return { links: baseLinks };
     const image = product.image_url || "";
     return {
       meta: [
@@ -45,10 +51,11 @@ export const Route = createFileRoute("/p/$productId")({
         { property: "og:image", content: image },
       ],
       links: image
-        ? [{ rel: "preload", as: "image", href: image, fetchpriority: "high" }]
-        : [],
+        ? [...baseLinks, { rel: "preload", as: "image", href: image, fetchpriority: "high" }]
+        : baseLinks,
     };
   },
+
   pendingComponent: CheckoutSkeleton,
   component: CheckoutPage,
 });
