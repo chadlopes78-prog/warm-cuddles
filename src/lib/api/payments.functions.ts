@@ -119,6 +119,162 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
     };
   });
 
+type CheckoutSaleRow = {
+  id: string;
+  status?: string | null;
+  status_reason?: string | null;
+  created_at?: string | null;
+  payment_method?: string | null;
+  amount?: number | string | null;
+  customer_phone?: string | null;
+  transaction_id?: string | null;
+  payment_reference?: string | null;
+  products?: unknown;
+};
+
+type GatewayRecord = Record<string, unknown>;
+
+function record(value: unknown): GatewayRecord {
+  return value && typeof value === "object" ? (value as GatewayRecord) : {};
+}
+
+function gatewayRecordsFromPayload(payload: unknown): GatewayRecord[] {
+  if (Array.isArray(payload)) return payload.filter((item): item is GatewayRecord => !!item && typeof item === "object");
+
+  const root = record(payload);
+  const data = record(root.data);
+  const candidates = [
+    root.transactions,
+    root.transacoes,
+    root.items,
+    root.results,
+    root.data,
+    data.transactions,
+    data.transacoes,
+    data.items,
+    data.results,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.filter((item): item is GatewayRecord => !!item && typeof item === "object");
+    }
+  }
+
+  const transaction = record(root.transacao);
+  if (Object.keys(transaction).length > 0) return [transaction];
+  if (root.id || root.status || root.transaction_reference || root.reference) return [root];
+  return [];
+}
+
+async function fetchGatewayJson(url: string, headers: HeadersInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { headers, signal: controller.signal });
+    if (!res.ok) return null;
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function reconcileCheckoutSaleWithGateway(sale: CheckoutSaleRow) {
+  const apiKey = process.env.PAYMENT_API_KEY || DEFAULT_API_KEY;
+  if (!apiKey || String(sale.status ?? "").toLowerCase() !== "pending") return null;
+
+  const ageMs = sale.created_at ? Date.now() - new Date(sale.created_at).getTime() : 0;
+  // Start reconciliation quickly, but not on the very first poll. This keeps
+  // checkout fast and still fixes the "processando" loop when webhook/bg fails.
+  if (ageMs < 2_500) return null;
+
+  const baseUrl = process.env.PAYMENT_API_BASE_URL || DEFAULT_BASE_URL;
+  const headers = { Accept: "application/json", "X-API-Key": apiKey };
+  const {
+    confirmSalePayment,
+    markSaleTerminalFailure,
+    normalizeGatewayStatus,
+    pendingReasonForMethod,
+    readGatewayMessage,
+    readGatewayReference,
+    readGatewayTransactionId,
+  } = await import("@/lib/payments/confirmation.server");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  const localRef = sale.payment_reference ? String(sale.payment_reference) : "";
+  const localTx = sale.transaction_id ? String(sale.transaction_id) : "";
+  const matchesSale = (tx: GatewayRecord) => {
+    const txRef = readGatewayReference(tx) ?? "";
+    const txId = readGatewayTransactionId(tx) ?? "";
+    return Boolean(
+      (localRef && (txRef === localRef || txId === localRef)) ||
+        (localTx && (txRef === localTx || txId === localTx)),
+    );
+  };
+
+  let gatewayTx: GatewayRecord | null = null;
+
+  if (localTx) {
+    const detail = await fetchGatewayJson(
+      joinUrl(baseUrl, `/api/transactions/${encodeURIComponent(localTx)}`),
+      headers,
+      1_500,
+    );
+    gatewayTx = gatewayRecordsFromPayload(detail).find(matchesSale) ?? null;
+  }
+
+  if (!gatewayTx && localRef) {
+    const list = await fetchGatewayJson(joinUrl(baseUrl, "/api/transactions"), headers, 2_500);
+    gatewayTx = gatewayRecordsFromPayload(list).find(matchesSale) ?? null;
+  }
+
+  if (!gatewayTx) return null;
+
+  const finalStatus = normalizeGatewayStatus(gatewayTx, true);
+  const transactionId = readGatewayTransactionId(gatewayTx);
+  const reference = readGatewayReference(gatewayTx) || localRef || null;
+
+  if (finalStatus === "paid") {
+    await confirmSalePayment({
+      saleId: sale.id,
+      transactionId,
+      reference,
+      rawPayload: gatewayTx,
+      triggerPushcut: true,
+    });
+  } else if (finalStatus === "failed" || finalStatus === "expired") {
+    await markSaleTerminalFailure({
+      saleId: sale.id,
+      status: finalStatus,
+      transactionId,
+      reference,
+      reason: readGatewayMessage(gatewayTx) || "Pagamento recusado pelo gateway.",
+      method: sale.payment_method ?? null,
+    });
+  } else if (transactionId || reference) {
+    await supabaseAdmin
+      .from("sales")
+      .update({
+        ...(transactionId ? { transaction_id: transactionId.slice(0, 200) } : {}),
+        ...(reference ? { payment_reference: reference.slice(0, 200) } : {}),
+        status_reason: pendingReasonForMethod(sale.payment_method ?? null, "processing").label,
+      })
+      .eq("id", sale.id)
+      .eq("status", "pending");
+  }
+
+  const refreshed = await supabaseAdmin
+    .from("sales")
+    .select(PAYMENT_SUCCESS_SELECT)
+    .eq("id", sale.id)
+    .maybeSingle();
+
+  return refreshed.error ? null : refreshed.data;
+}
+
 function normalizeMozambicanPhone(value: string) {
   const digits = value.replace(/\D/g, "");
   if (digits.startsWith("258") && digits.length === 12) return digits;
