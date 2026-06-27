@@ -829,6 +829,10 @@ function ProductsPage() {
                             <QrCode className="mr-2 h-4 w-4" /> QR Code
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleDuplicateProduct(product)}>
+                            <Copy className="mr-2 h-4 w-4" /> Duplicar
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-red-600"
                             onClick={() => handleDeleteProduct(product.id)}
