@@ -308,6 +308,46 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
   };
 
+  const pendingToSend = useMemo(
+    () => periodItems.filter((i) => i.status === "pending" && !i.contactSent),
+    [periodItems],
+  );
+
+  const handleSendAll = async () => {
+    if (sendingBulk) return;
+    const targets = pendingToSend;
+    if (targets.length === 0) {
+      toast.info("Nenhum checkout pendente para contactar.");
+      return;
+    }
+    setSendingBulk(true);
+    let sent = 0;
+    let failed = 0;
+    toast.info(`Enviando ${targets.length} mensagem(ns)... mantenha esta aba aberta.`);
+    for (const item of targets) {
+      try {
+        const url = buildWhatsAppLink(item);
+        const win = window.open(url, "_blank", "noopener,noreferrer");
+        if (!win) {
+          failed++;
+          toast.error("O navegador bloqueou novas abas. Permita pop-ups para esta página.");
+          break;
+        }
+        await logAttempt({
+          data: { productId: item.productId, customerPhone: item.customerPhone },
+        });
+        sent++;
+        await new Promise((r) => setTimeout(r, 600));
+      } catch {
+        failed++;
+      }
+    }
+    await refetchAttempts();
+    setSendingBulk(false);
+    if (sent > 0) toast.success(`${sent} mensagem(ns) enviada(s). Clientes marcados como "Contato Enviado".`);
+    if (failed > 0 && sent === 0) toast.error("Não foi possível enviar as mensagens.");
+  };
+
   const periodLabel =
     period === "today" ? "Hoje" :
     period === "7d" ? "Últimos 7 dias" :
