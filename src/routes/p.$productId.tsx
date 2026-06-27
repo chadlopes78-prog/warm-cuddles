@@ -107,12 +107,15 @@ function CheckoutPage() {
   const [processingPayment, setProcessingPayment] = useState(false);
   const [paymentStatusMessage, setPaymentStatusMessage] = useState<string | null>(null);
   const [paymentErrorMessage, setPaymentErrorMessage] = useState<string | null>(null);
+  const [paymentErrorCode, setPaymentErrorCode] = useState<PaymentResult extends { code?: infer C } ? C | null : null>(null);
+  const [paymentRetryable, setPaymentRetryable] = useState(false);
 
   const [name, setName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [phone, setPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "emola">("mpesa");
   const [bumpAccepted, setBumpAccepted] = useState(false);
+
   const [timeLeft, setTimeLeft] = useState(360);
 
   useEffect(() => {
