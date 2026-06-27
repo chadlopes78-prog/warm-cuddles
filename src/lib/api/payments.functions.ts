@@ -299,7 +299,7 @@ export const processPayment = createServerFn({ method: "POST" })
     const earlyController: AbortController = new AbortController();
     const earlyTimeoutId: ReturnType<typeof setTimeout> = setTimeout(
       () => earlyController.abort(),
-      120_000,
+      90_000,
     );
     const tGwSent = Date.now();
     console.info("[perf] gateway early-fire", {
@@ -410,7 +410,7 @@ export const processPayment = createServerFn({ method: "POST" })
         }
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120_000);
+        const timeoutId = setTimeout(() => controller.abort(), 90_000);
         const tRetry = Date.now();
         try {
           res = await fetch(endpoint, {
