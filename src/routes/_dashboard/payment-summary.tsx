@@ -269,21 +269,6 @@ function Row({ color, label, value, pct }: { color: string; label: string; value
 }
 
 
-function Row({ color, label, value, pct }: { color: string; label: string; value: string; pct: number }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex items-center gap-2">
-        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-600">{label}</span>
-      </div>
-      <div className="text-right">
-        <p className="text-sm font-bold text-slate-900">{value}</p>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{pct.toFixed(1)}%</p>
-      </div>
-    </div>
-  );
-}
-
 function MethodCard({
   label,
   icon,
@@ -293,20 +278,32 @@ function MethodCard({
   label: string;
   icon: React.ReactNode;
   accent: string;
-  data: { total: number; count: number; avg: number; pct: number };
+  data: { total: number; gross: number; count: number; avg: number; pct: number };
 }) {
   return (
-    <Card className="rounded-2xl border-slate-100 shadow-sm">
+    <Card className="rounded-2xl border-border bg-card shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base font-bold text-slate-900">{label}</CardTitle>
+        <CardTitle className="text-base font-bold text-foreground">{label}</CardTitle>
         <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${accent}`}>{icon}</div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Total líquido</p>
-          <p className="text-2xl font-black tracking-tight text-slate-900">{fmt(data.total)}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total líquido</p>
+          <p className="text-2xl font-black tracking-tight text-emerald-500">{fmt(data.total)}</p>
+          <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+            Bruto {fmt(data.gross)}
+          </p>
         </div>
-        <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-2">
+        <div className="grid grid-cols-3 gap-3 border-t border-border pt-2">
+          <Stat label="Transações" value={String(data.count)} />
+          <Stat label="Ticket médio" value={fmt(data.avg)} icon={<TrendingUp className="h-3 w-3" />} />
+          <Stat label="% do total" value={`${data.pct.toFixed(1)}%`} icon={<Percent className="h-3 w-3" />} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
           <Stat label="Transações" value={String(data.count)} />
           <Stat label="Ticket médio" value={fmt(data.avg)} icon={<TrendingUp className="h-3 w-3" />} />
           <Stat label="% do total" value={`${data.pct.toFixed(1)}%`} icon={<Percent className="h-3 w-3" />} />
