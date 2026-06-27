@@ -44,6 +44,7 @@ type RecoveryItem = {
   customerName: string;
   customerPhone: string;
   productName: string;
+  productId: string | null;
   productLinkId: string | null;
   amount: number;
   lastAttemptAt: string;
