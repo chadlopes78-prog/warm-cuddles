@@ -67,8 +67,6 @@ function DashboardPage() {
     return (sessionStorage.getItem("dashboard-preset") as DateRangePreset) || "last7days";
   });
 
-  const [resetConfirmText, setResetConfirmText] = useState("");
-  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
 
   const queryClient = useQueryClient();
 
