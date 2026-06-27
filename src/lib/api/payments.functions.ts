@@ -49,10 +49,10 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
   .inputValidator((input) => PaymentSuccessInput.parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: sale, error } = await supabaseAdmin
+    let { data: sale, error } = await supabaseAdmin
       .from("sales")
       .select(
-        "id, status, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)",
+        "id, status, status_reason, created_at, payment_method, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)",
       )
       .eq("id", data.saleId)
       .maybeSingle();
@@ -62,6 +62,27 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
       throw new Error("Não foi possível consultar o estado do pagamento.");
     }
     if (!sale) return { sale: null, product: null };
+
+    const currentStatus = String(sale.status ?? "").toLowerCase();
+    const pendingAgeMs = sale.created_at ? Date.now() - new Date(sale.created_at).getTime() : 0;
+    if (currentStatus === "pending" && pendingAgeMs > 6 * 60_000) {
+      const { markSaleTerminalFailure } = await import("@/lib/payments/confirmation.server");
+      await markSaleTerminalFailure({
+        saleId: sale.id,
+        status: "expired",
+        reason: "Pagamento não confirmado dentro do tempo limite. Tente novamente ou escolha outro método.",
+        method: sale.payment_method ?? null,
+      }).catch((e) => console.error("[checkout] auto-expire pending sale failed", e));
+
+      const refreshed = await supabaseAdmin
+        .from("sales")
+        .select(
+          "id, status, status_reason, created_at, payment_method, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)",
+        )
+        .eq("id", data.saleId)
+        .maybeSingle();
+      if (!refreshed.error && refreshed.data) sale = refreshed.data;
+    }
 
     const status = String(sale.status ?? "").toLowerCase();
     const isPaid = ["paid", "approved", "success", "completed"].includes(status);
@@ -75,7 +96,7 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
     } | null;
 
     return {
-      sale: { status: sale.status },
+      sale: { status: sale.status, status_reason: sale.status_reason },
       product: product
         ? {
             access_link: isPaid ? product.access_link : null,
@@ -99,6 +120,50 @@ function normalizeMozambicanPhone(value: string) {
 
 function joinUrl(base: string, path: string) {
   return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+}
+
+function configuredPublicUrl() {
+  const raw =
+    process.env.PAYMENT_CALLBACK_URL ||
+    process.env.PAYMENT_WEBHOOK_URL ||
+    process.env.PUBLIC_SITE_URL ||
+    process.env.APP_URL ||
+    process.env.SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+  return raw ? raw.replace(/\/+$/, "") : "";
+}
+
+function configuredWebhookUrl() {
+  const explicit = process.env.PAYMENT_WEBHOOK_URL || process.env.PAYMENT_CALLBACK_URL || "";
+  const secret = process.env.PAYMENT_WEBHOOK_SECRET || "";
+  const appendSecret = (url: string) => {
+    if (!secret) return url;
+    try {
+      const u = new URL(url);
+      if (!u.searchParams.has("token") && !u.searchParams.has("secret")) {
+        u.searchParams.set("token", secret);
+      }
+      return u.toString();
+    } catch {
+      return url;
+    }
+  };
+
+  if (explicit && /^https?:\/\//i.test(explicit)) {
+    const clean = explicit.replace(/\/+$/, "");
+    try {
+      const u = new URL(clean);
+      if (/\/api\/public\/payment-webhook$/i.test(u.pathname)) return appendSecret(clean);
+      u.pathname = `${u.pathname.replace(/\/+$/, "")}/api/public/payment-webhook`;
+      return appendSecret(u.toString());
+    } catch {
+      // Fall back to appending the webhook path below.
+    }
+    return appendSecret(`${clean}/api/public/payment-webhook`);
+  }
+
+  const publicUrl = configuredPublicUrl();
+  return publicUrl ? appendSecret(`${publicUrl}/api/public/payment-webhook`) : "";
 }
 
 export const processPayment = createServerFn({ method: "POST" })
@@ -288,7 +353,9 @@ export const processPayment = createServerFn({ method: "POST" })
     // dedupe duplicated submissions.
     const endpoint = joinUrl(baseUrl, PAY_PATH);
     const gatewayPhone = data.method === "mpesa" ? msisdn : msisdn.slice(3);
-    const gatewayPayoutNumber = data.method === "mpesa" ? payoutNumber : payoutNumber.slice(3);
+    // PayBlack/Payflax docs: customer phone for e-Mola is local 9 digits,
+    // but payout_number remains full 258XXXXXXXXX for both wallets.
+    const gatewayPayoutNumber = payoutNumber;
     const earlyBody: Record<string, unknown> = {
       api_key: apiKey,
       method: gatewayMethod,
@@ -296,7 +363,10 @@ export const processPayment = createServerFn({ method: "POST" })
       amount: String(amount),
       payout_number: gatewayPayoutNumber,
       payout_method: payoutMethod,
+      transaction_reference: reference,
     };
+    const callbackUrl = configuredWebhookUrl();
+    if (callbackUrl) earlyBody.callback_url = callbackUrl;
     if (gatewayMethod === "emola_c2b") earlyBody.name = customerName.slice(0, 60);
 
     const earlyController: AbortController = new AbortController();
@@ -434,7 +504,7 @@ export const processPayment = createServerFn({ method: "POST" })
               payment_reference: reference,
             })
             .eq("id", sale.id)
-            .neq("status", "paid");
+            .eq("status", "pending");
         }
       } catch (err) {
         clearTimeout(earlyTimeoutId);
@@ -447,8 +517,8 @@ export const processPayment = createServerFn({ method: "POST" })
             status_reason: pendingReasonForMethod(gatewayMethod, "awaiting_customer").label,
             payment_reference: reference,
           })
-          .neq("status", "paid")
           .eq("id", sale.id)
+          .eq("status", "pending")
           .then(undefined, () => {});
       }
     };
@@ -462,12 +532,12 @@ export const processPayment = createServerFn({ method: "POST" })
     // errors (invalid number, insufficient balance). The gateway pushes the
     // PIN to the SIM independently, so we don't need to wait for its HTTP
     // response to tell the customer to check their phone.
-    const CLIENT_WAIT_MS = 500;
+    const CLIENT_WAIT_MS = 3_000;
+    const gatewaySettledPromise = earlyGatewayPromise
+      .then((res) => ({ kind: "response" as const, res }))
+      .catch((e) => ({ kind: "error" as const, error: e }));
     const raceResult = await Promise.race([
-      earlyGatewayPromise.then(async (res) => {
-        const text = await res.text();
-        return { kind: "response" as const, res, text };
-      }).catch((e) => ({ kind: "error" as const, error: e })),
+      gatewaySettledPromise,
       new Promise<{ kind: "timeout" }>((resolve) =>
         setTimeout(() => resolve({ kind: "timeout" }), CLIENT_WAIT_MS),
       ),
@@ -491,7 +561,8 @@ export const processPayment = createServerFn({ method: "POST" })
 
     // Got a synchronous gateway response within the budget.
     clearTimeout(earlyTimeoutId);
-    const { res, text } = raceResult;
+    const { res } = raceResult;
+    const text = await res.text();
     let json: Record<string, unknown> | null = null;
     try { json = text ? JSON.parse(text) : null; } catch { json = { raw: text }; }
 
@@ -547,7 +618,7 @@ export const processPayment = createServerFn({ method: "POST" })
             payment_reference: reference,
           })
           .eq("id", sale.id)
-          .neq("status", "paid");
+          .eq("status", "pending");
       }
     } catch (err) {
       console.error("processPayment finalize error", err);

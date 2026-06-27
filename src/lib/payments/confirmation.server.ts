@@ -38,8 +38,12 @@ type SaleForConfirmation = {
   transaction_id?: string | null;
   payment_reference?: string | null;
   traffic_page_id?: string | null;
+  created_at?: string | null;
   products?: { name?: string | null } | null;
 };
+
+const SALE_CONFIRMATION_SELECT =
+  "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, created_at, products(name)";
 
 function asObject(value: unknown): GatewayPayload {
   return value && typeof value === "object" ? (value as GatewayPayload) : {};
@@ -145,19 +149,24 @@ export function normalizeGatewayStatus(input: unknown, httpOk = true): Normalize
   };
   const providerParsed = nestedObject(provider, "parsed");
   const successValue = payload.success ?? payload.ok ?? data.success ?? data.ok;
+  const hasTransactionObject = Object.keys(transacao).length > 0;
+  // Prefer the real transaction object over the top-level HTTP envelope.
+  // Payflax can return `{ status: "success", transacao: { status: "pending" } }`
+  // when the PIN prompt was merely created. Treating the wrapper as terminal
+  // would approve a payment before backend confirmation, which is unsafe.
   const raw = String(
-    payload.status ??
-      payload.payment_status ??
-      payload.state ??
-      payload.result ??
+    transacao.status ??
+      transacao.payment_status ??
+      transacao.state ??
+      transacao.result ??
       data.status ??
       data.payment_status ??
       data.state ??
       data.result ??
-      transacao.status ??
-      transacao.payment_status ??
-      transacao.state ??
-      transacao.result ??
+      (hasTransactionObject ? null : payload.status) ??
+      (hasTransactionObject ? null : payload.payment_status) ??
+      (hasTransactionObject ? null : payload.state) ??
+      (hasTransactionObject ? null : payload.result) ??
       "",
   )
     .toLowerCase()
@@ -345,9 +354,7 @@ export function pendingReasonForMethod(
 async function fetchSaleById(saleId: string) {
   const { data, error } = await supabaseAdmin
     .from("sales")
-    .select(
-      "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, products(name)",
-    )
+    .select(SALE_CONFIRMATION_SELECT)
     .eq("id", saleId)
     .maybeSingle();
   if (error) throw error;
@@ -361,9 +368,7 @@ export async function findSaleForGatewayEvent(
   if (transactionId) {
     const { data, error } = await supabaseAdmin
       .from("sales")
-      .select(
-        "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, products(name)",
-      )
+      .select(SALE_CONFIRMATION_SELECT)
       .eq("transaction_id", transactionId.slice(0, 200))
       .maybeSingle();
     if (error) throw error;
@@ -373,13 +378,23 @@ export async function findSaleForGatewayEvent(
   if (reference) {
     const { data, error } = await supabaseAdmin
       .from("sales")
-      .select(
-        "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, products(name)",
-      )
+      .select(SALE_CONFIRMATION_SELECT)
       .eq("payment_reference", reference.slice(0, 200))
       .maybeSingle();
     if (error) throw error;
-    return data;
+    if (data) return data;
+
+    // Payflax names its own gateway identifier `transaction_reference`.
+    // Some callbacks send only that field, while our local `payment_reference`
+    // stores the PMZ... idempotency key. Resolve both possibilities so a real
+    // successful webhook never stays orphaned as pending.
+    const byGatewayReference = await supabaseAdmin
+      .from("sales")
+      .select(SALE_CONFIRMATION_SELECT)
+      .eq("transaction_id", reference.slice(0, 200))
+      .maybeSingle();
+    if (byGatewayReference.error) throw byGatewayReference.error;
+    return byGatewayReference.data;
   }
 
   return null;
@@ -394,10 +409,19 @@ export async function confirmSalePayment(options: {
 }) {
   const { saleId, transactionId, reference, rawPayload, triggerPushcut = false } = options;
 
-  const updatePayload: { status: string; payment_reference: string; transaction_id?: string; status_reason: null } = {
+  const updatePayload: {
+    status: string;
+    payment_reference: string;
+    status_reason: null;
+    payment_confirmed_at: string;
+    payment_failed_at: null;
+    transaction_id?: string;
+  } = {
     status: "paid",
     payment_reference: reference ? reference.slice(0, 200) : paymentReferenceForSale(saleId),
     status_reason: null,
+    payment_confirmed_at: new Date().toISOString(),
+    payment_failed_at: null,
   };
   if (transactionId) updatePayload.transaction_id = transactionId.slice(0, 200);
 
@@ -406,9 +430,7 @@ export async function confirmSalePayment(options: {
     .update(updatePayload)
     .eq("id", saleId)
     .neq("status", "paid")
-    .select(
-      "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, products(name)",
-    )
+    .select(SALE_CONFIRMATION_SELECT)
     .maybeSingle();
 
   if (updateError) throw updateError;
@@ -424,13 +446,7 @@ export async function confirmSalePayment(options: {
         .eq("id", saleId)
         .eq("status", "paid");
     }
-    const currentSale = await fetchSaleById(saleId);
-    if (currentSale?.status === "paid") {
-      await dispatchApprovedSideEffects(currentSale, rawPayload, triggerPushcut).catch((err) => {
-        console.error("[payments] approved side-effects retry failed", err);
-      });
-    }
-    return { sale: currentSale, becamePaid: false };
+    return { sale: await fetchSaleById(saleId), becamePaid: false };
   }
 
   await dispatchApprovedSideEffects(updated, rawPayload, triggerPushcut).catch((err) => {
@@ -459,15 +475,22 @@ export async function markSaleTerminalFailure(options: {
   // Only set payment_reference when a real gateway reference is supplied.
   // Never fall back to the human-readable reason — it's not unique and
   // collides with `sales_payment_reference_unique` across stale rows.
-  const updatePayload: Record<string, unknown> = {
+  const updatePayload: {
+    status: string;
+    status_reason: string;
+    payment_failed_at: string;
+    transaction_id?: string;
+    payment_reference?: string;
+  } = {
     status: finalStatus,
     status_reason: reasonInfo.label,
+    payment_failed_at: new Date().toISOString(),
   };
   if (transactionId) updatePayload.transaction_id = transactionId.slice(0, 200);
   if (reference) updatePayload.payment_reference = reference.slice(0, 200);
   const { data: updated, error } = await supabaseAdmin
     .from("sales")
-    .update(updatePayload as any)
+    .update(updatePayload)
     .eq("id", saleId)
     .neq("status", "paid")
     .neq("status", "failed")
