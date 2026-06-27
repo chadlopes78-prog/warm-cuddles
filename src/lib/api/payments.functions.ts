@@ -500,7 +500,7 @@ export const processPayment = createServerFn({ method: "POST" })
               payment_reference: reference,
             })
             .eq("id", sale.id)
-            .neq("status", "paid");
+            .eq("status", "pending");
         }
       } catch (err) {
         clearTimeout(earlyTimeoutId);
@@ -513,8 +513,8 @@ export const processPayment = createServerFn({ method: "POST" })
             status_reason: pendingReasonForMethod(gatewayMethod, "awaiting_customer").label,
             payment_reference: reference,
           })
-          .neq("status", "paid")
           .eq("id", sale.id)
+          .eq("status", "pending")
           .then(undefined, () => {});
       }
     };
@@ -614,7 +614,7 @@ export const processPayment = createServerFn({ method: "POST" })
             payment_reference: reference,
           })
           .eq("id", sale.id)
-          .neq("status", "paid");
+          .eq("status", "pending");
       }
     } catch (err) {
       console.error("processPayment finalize error", err);
