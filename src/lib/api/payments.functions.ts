@@ -49,10 +49,10 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
   .inputValidator((input) => PaymentSuccessInput.parse(input))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: sale, error } = await supabaseAdmin
+    let { data: sale, error } = await supabaseAdmin
       .from("sales")
       .select(
-        "id, status, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)",
+        "id, status, status_reason, created_at, payment_method, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)",
       )
       .eq("id", data.saleId)
       .maybeSingle();
@@ -62,6 +62,27 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
       throw new Error("Não foi possível consultar o estado do pagamento.");
     }
     if (!sale) return { sale: null, product: null };
+
+    const currentStatus = String(sale.status ?? "").toLowerCase();
+    const pendingAgeMs = sale.created_at ? Date.now() - new Date(sale.created_at).getTime() : 0;
+    if (currentStatus === "pending" && pendingAgeMs > 6 * 60_000) {
+      const { markSaleTerminalFailure } = await import("@/lib/payments/confirmation.server");
+      await markSaleTerminalFailure({
+        saleId: sale.id,
+        status: "expired",
+        reason: "Pagamento não confirmado dentro do tempo limite. Tente novamente ou escolha outro método.",
+        method: sale.payment_method ?? null,
+      }).catch((e) => console.error("[checkout] auto-expire pending sale failed", e));
+
+      const refreshed = await supabaseAdmin
+        .from("sales")
+        .select(
+          "id, status, status_reason, created_at, payment_method, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)",
+        )
+        .eq("id", data.saleId)
+        .maybeSingle();
+      if (!refreshed.error && refreshed.data) sale = refreshed.data;
+    }
 
     const status = String(sale.status ?? "").toLowerCase();
     const isPaid = ["paid", "approved", "success", "completed"].includes(status);
@@ -75,7 +96,7 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
     } | null;
 
     return {
-      sale: { status: sale.status },
+      sale: { status: sale.status, status_reason: sale.status_reason },
       product: product
         ? {
             access_link: isPaid ? product.access_link : null,
