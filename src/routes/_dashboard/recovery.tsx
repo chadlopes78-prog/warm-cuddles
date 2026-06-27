@@ -315,7 +315,7 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
                               onClick={() => {
                                 logAttempt({
                                   data: {
-                                    productId: item.productLinkId && /^[0-9a-f-]{36}$/i.test(item.productLinkId) ? item.productLinkId : null,
+                                    productId: item.productId,
                                     customerPhone: item.customerPhone,
                                   },
                                 }).then(() => refetchAttempts()).catch(() => {});
