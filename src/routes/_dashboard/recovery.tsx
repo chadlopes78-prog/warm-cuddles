@@ -172,6 +172,7 @@ function RecoveryPage() {
         customerName: reference.customer_name ?? "Cliente",
         customerPhone: reference.customer_phone ?? "",
         productName: reference.products?.name ?? "Produto",
+        productId: reference.product_id ?? reference.products?.id ?? null,
         productLinkId: reference.products?.custom_url || reference.products?.id || reference.product_id,
         amount,
         lastAttemptAt: reference.created_at,
