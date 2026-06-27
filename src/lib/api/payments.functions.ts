@@ -458,7 +458,11 @@ export const processPayment = createServerFn({ method: "POST" })
     // number, etc.) we surface it to the customer. If it stays open waiting
     // for the PIN, we return success with the saleId so the client can poll
     // payment-success and avoid Safari's ~60s "Load failed" abort.
-    const CLIENT_WAIT_MS = 20_000;
+    // Short client-facing budget: just enough to catch immediate terminal
+    // errors (invalid number, insufficient balance). The gateway pushes the
+    // PIN to the SIM independently, so we don't need to wait for its HTTP
+    // response to tell the customer to check their phone.
+    const CLIENT_WAIT_MS = 2_500;
     const raceResult = await Promise.race([
       earlyGatewayPromise.then(async (res) => {
         const text = await res.text();
