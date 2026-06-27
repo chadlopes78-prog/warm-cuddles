@@ -643,7 +643,7 @@ export const processPayment = createServerFn({ method: "POST" })
             ? ((txEnvelope.id as string | undefined) ??
               (txEnvelope.transaction_reference as string | undefined))
             : null) ?? readGatewayTransactionId(json);
-        const finalStatus = normalizeGatewayStatus(txEnvelope ?? json, res.ok);
+        const finalStatus = normalizeGatewayStatus(json ?? txEnvelope, res.ok);
 
         if (finalStatus === "paid") {
           await confirmSalePayment({
@@ -756,7 +756,7 @@ export const processPayment = createServerFn({ method: "POST" })
         ? ((txEnvelope.id as string | undefined) ??
           (txEnvelope.transaction_reference as string | undefined))
         : null) ?? readGatewayTransactionId(json);
-    const finalStatus = normalizeGatewayStatus(txEnvelope ?? json, res.ok);
+    const finalStatus = normalizeGatewayStatus(json ?? txEnvelope, res.ok);
 
     try {
       if (finalStatus === "paid") {
