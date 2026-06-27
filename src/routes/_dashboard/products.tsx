@@ -366,6 +366,25 @@ function ProductsPage() {
     }
   };
 
+  const handleDuplicateProduct = async (product: any) => {
+    try {
+      const {
+        id: _id,
+        created_at: _c,
+        updated_at: _u,
+        custom_url: _cu,
+        ...rest
+      } = product;
+      const payload = { ...rest, name: `${product.name} (Cópia)` };
+      const { error } = await supabase.from("products").insert(payload);
+      if (error) throw error;
+      toast.success("Produto duplicado com sucesso!");
+      fetchProducts();
+    } catch (error: any) {
+      toast.error(error.message ?? "Erro ao duplicar produto");
+    }
+  };
+
   const copyCheckoutLink = (productId: string) => {
     const url = `${window.location.origin}/p/${productId}`;
     navigator.clipboard.writeText(url);
@@ -808,6 +827,10 @@ function ProductsPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem>
                             <QrCode className="mr-2 h-4 w-4" /> QR Code
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleDuplicateProduct(product)}>
+                            <Copy className="mr-2 h-4 w-4" /> Duplicar
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
