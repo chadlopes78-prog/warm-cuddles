@@ -393,49 +393,6 @@ function DashboardPage() {
         <div className="flex flex-wrap items-center gap-2">
           <DateRangePicker onRangeChange={handleRangeChange} initialPreset={preset} initialRange={dateRange} />
           
-          <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 gap-2 font-black uppercase tracking-tighter text-[10px]">
-                <Trash2 className="h-3.5 w-3.5" />
-                Resetar Dados
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="max-w-md rounded-3xl border-none shadow-2xl">
-              <AlertDialogHeader>
-                <div className="flex items-center gap-3 text-red-600 mb-2">
-                  <div className="p-3 bg-red-100 rounded-2xl">
-                    <AlertTriangle className="h-6 w-6" />
-                  </div>
-                  <AlertDialogTitle className="text-2xl font-black uppercase tracking-tighter">Limpeza de Dados</AlertDialogTitle>
-                </div>
-                <AlertDialogDescription className="text-slate-600 font-bold">
-                  Esta ação irá apagar todas as vendas e métricas do período selecionado. <span className="text-red-600">Irreversível.</span>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              
-              <div className="py-4 space-y-3">
-                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Digite CONFIRMAR RESET para prosseguir:</p>
-                <Input 
-                  value={resetConfirmText}
-                  onChange={(e) => setResetConfirmText(e.target.value)}
-                  placeholder="CONFIRMAR RESET"
-                  className="h-12 border-2 text-center font-black uppercase tracking-widest focus-visible:ring-red-500 rounded-2xl"
-                />
-              </div>
-
-              <AlertDialogFooter className="gap-2 sm:gap-0">
-                <AlertDialogCancel className="h-12 rounded-2xl font-black uppercase tracking-tighter border-2">Sair</AlertDialogCancel>
-                <Button
-                  variant="destructive"
-                  disabled={resetConfirmText !== "CONFIRMAR RESET" || resetData.isPending}
-                  onClick={() => resetData.mutate()}
-                  className="h-12 rounded-2xl font-black uppercase tracking-tighter px-6"
-                >
-                  {resetData.isPending ? "Limpando..." : "Confirmar Reset"}
-                </Button>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
       </div>
 
