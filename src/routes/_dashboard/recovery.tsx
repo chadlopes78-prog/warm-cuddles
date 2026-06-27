@@ -95,7 +95,39 @@ function timeAgo(iso: string) {
 
 function RecoveryPage() {
   const [search, setSearch] = useState("");
+  const [period, setPeriod] = useState<Period>("30d");
+  const [customFrom, setCustomFrom] = useState<string>("");
+  const [customTo, setCustomTo] = useState<string>("");
+  const [resetAt, setResetAt] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
   const logAttempt = useServerFn(logRecoveryAttempt);
+  const resetHistory = useServerFn(resetRecoveryHistory);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setResetAt(window.localStorage.getItem(RESET_STORAGE_KEY));
+    }
+  }, []);
+
+  const periodRange = useMemo(() => {
+    const now = new Date();
+    if (period === "today") {
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      return { from: start, to: now };
+    }
+    if (period === "7d") {
+      return { from: new Date(now.getTime() - 7 * 86400_000), to: now };
+    }
+    if (period === "30d") {
+      return { from: new Date(now.getTime() - 30 * 86400_000), to: now };
+    }
+    // custom
+    const from = customFrom ? new Date(`${customFrom}T00:00:00`) : new Date(now.getTime() - 30 * 86400_000);
+    const to = customTo ? new Date(`${customTo}T23:59:59`) : now;
+    return { from, to };
+  }, [period, customFrom, customTo]);
+
 
   const { data: sales = [], isLoading } = useQuery({
     queryKey: ["recovery-sales"],
