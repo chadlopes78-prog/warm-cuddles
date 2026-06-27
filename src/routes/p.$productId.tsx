@@ -1,7 +1,7 @@
 import { createFileRoute, useParams } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect } from "react";
-import { processPayment, type PaymentResult } from "@/lib/api/payments.functions";
+import { processPayment, getPaymentSuccessData, type PaymentResult } from "@/lib/api/payments.functions";
 import { getPublicProduct } from "@/lib/api/product-public.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -109,6 +109,9 @@ function CheckoutPage() {
   const [paymentErrorMessage, setPaymentErrorMessage] = useState<string | null>(null);
   const [paymentErrorCode, setPaymentErrorCode] = useState<string | null>(null);
   const [paymentRetryable, setPaymentRetryable] = useState(false);
+  const [pendingSaleId, setPendingSaleId] = useState<string | null>(null);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const pollFn = useServerFn(getPaymentSuccessData);
 
 
   const [name, setName] = useState("");
@@ -125,6 +128,52 @@ function CheckoutPage() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Poll sale status in-place after gateway dispatch — no redirect to a waiting page.
+  useEffect(() => {
+    if (!pendingSaleId) return;
+    let cancelled = false;
+    let attempts = 0;
+    const MAX = 80;
+    const TERMINAL_OK = ["paid", "approved", "success", "completed"];
+    const TERMINAL_FAIL = ["failed", "expired", "cancelled", "canceled"];
+    (async () => {
+      while (!cancelled && attempts < MAX) {
+        attempts++;
+        try {
+          const r = (await pollFn({ data: { saleId: pendingSaleId } })) as
+            | { sale?: { status?: string | null } | null; product?: { thank_you_url?: string | null } | null }
+            | null;
+          if (cancelled) return;
+          const status = String(r?.sale?.status ?? "").toLowerCase();
+          if (TERMINAL_OK.includes(status)) {
+            setPaymentConfirmed(true);
+            setProcessingPayment(false);
+            setPaymentStatusMessage("Pagamento aprovado! Obrigado.");
+            const url = r?.product?.thank_you_url?.trim();
+            if (url) {
+              setTimeout(() => window.location.replace(url), 800);
+            }
+            return;
+          }
+          if (TERMINAL_FAIL.includes(status)) {
+            setProcessingPayment(false);
+            setPaymentStatusMessage(null);
+            setPaymentErrorMessage("Pagamento não concluído. Tente novamente.");
+            setPaymentErrorCode("gateway");
+            setPaymentRetryable(true);
+            setPendingSaleId(null);
+            return;
+          }
+        } catch (e) {
+          console.error("[checkout] poll error", e);
+        }
+        await new Promise((r) => setTimeout(r, attempts < 25 ? 1500 : 3000));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [pendingSaleId, pollFn]);
+
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -256,8 +305,10 @@ function CheckoutPage() {
       }
 
       trackEvent("Purchase");
-      setPaymentStatusMessage("Pagamento enviado. A redirecionar...");
-      window.location.href = `/payment-success?productId=${productId}&saleId=${result.saleId}`;
+      setPaymentStatusMessage(
+        `Pedido enviado para ${paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola"}. Digite o PIN no seu telefone para concluir o pagamento.`,
+      );
+      setPendingSaleId(result.saleId);
     } catch (error: any) {
       setPaymentErrorMessage(error?.message || "Erro inesperado ao processar pagamento.");
       setPaymentErrorCode("internal");
