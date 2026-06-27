@@ -232,7 +232,18 @@ function RecoveryPage() {
     return out;
   }, [sales, firstAttemptByKey]);
 
-  const filtered = items.filter((i) => {
+  const periodItems = useMemo(() => {
+    const resetTs = resetAt ? +new Date(resetAt) : 0;
+    const fromTs = +periodRange.from;
+    const toTs = +periodRange.to;
+    return items.filter((i) => {
+      const t = +new Date(i.lastAttemptAt);
+      if (t < resetTs) return false;
+      return t >= fromTs && t <= toTs;
+    });
+  }, [items, periodRange, resetAt]);
+
+  const filtered = periodItems.filter((i) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
@@ -243,8 +254,8 @@ function RecoveryPage() {
   });
 
   const stats = useMemo(() => {
-    const abandoned = items.filter((i) => i.status === "pending" || i.status === "expired");
-    const recovered = items.filter((i) => i.status === "recovered");
+    const abandoned = periodItems.filter((i) => i.status === "pending" || i.status === "expired");
+    const recovered = periodItems.filter((i) => i.status === "recovered");
     const recoveredValue = recovered.reduce((sum, i) => sum + i.amount, 0);
     const total = abandoned.length + recovered.length;
     const rate = total > 0 ? (recovered.length / total) * 100 : 0;
@@ -254,7 +265,25 @@ function RecoveryPage() {
       recoveredValue,
       rate,
     };
-  }, [items]);
+  }, [periodItems]);
+
+  const handleReset = async () => {
+    setResetting(true);
+    try {
+      await resetHistory({});
+      const now = new Date().toISOString();
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(RESET_STORAGE_KEY, now);
+      }
+      setResetAt(now);
+      await refetchAttempts();
+      toast.success("Histórico de recuperação resetado.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao resetar histórico.");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const buildWhatsAppLink = (item: RecoveryItem) => {
     const phone = normalizePhone(item.customerPhone);
