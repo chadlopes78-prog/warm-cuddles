@@ -76,6 +76,9 @@ function isGatewayStepSuccess(step: GatewayPayload) {
 
 function hasPayflaxSettlementSuccess(payload: GatewayPayload, data: GatewayPayload, transacao: GatewayPayload) {
   const scopes = [payload, data, transacao];
+  const providerSuccess = scopes.some((scope) =>
+    isGatewayStepSuccess(gatewayStepPayload(scope, "provider_response")),
+  );
   const payoutSuccess = scopes.some((scope) => isGatewayStepSuccess(gatewayStepPayload(scope, "payout_result")));
   const feeSuccess = scopes.some(
     (scope) =>
@@ -89,9 +92,10 @@ function hasPayflaxSettlementSuccess(payload: GatewayPayload, data: GatewayPaylo
   });
 
   // Payflax can leave `transacao.status` as pending even after the wallet
-  // collection, fee and payout steps return errorCode "0" / "Successfully".
-  // At that point money has already moved, so the checkout must release access.
-  return payoutSuccess && (feeSuccess || hasPayoutAmount);
+  // collection/provider step returns errorCode "0" / "Successfully".
+  // At that point the customer has paid; payout/fee settlement may finish a
+  // little later and must not block the checkout redirect.
+  return providerSuccess || (payoutSuccess && (feeSuccess || hasPayoutAmount));
 }
 
 export function paymentReferenceForSale(saleId: string) {

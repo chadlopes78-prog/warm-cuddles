@@ -200,7 +200,7 @@ function CheckoutPage() {
         } catch (e) {
           console.error("[checkout] poll error", e);
         }
-        await new Promise((r) => setTimeout(r, attempts < 25 ? 1500 : 3000));
+        await new Promise((r) => setTimeout(r, attempts < 20 ? 700 : 1500));
       }
       if (!cancelled) {
         setProcessingPayment(false);
