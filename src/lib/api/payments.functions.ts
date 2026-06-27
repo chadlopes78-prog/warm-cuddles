@@ -517,7 +517,9 @@ export const processPayment = createServerFn({ method: "POST" })
           reason: String(message),
           method: gatewayMethod,
         });
-        return { success: false, saleId: sale.id, error: String(message) };
+        const cls = classifyError(String(message));
+        return { success: false, saleId: sale.id, error: String(message), code: cls.code, retryable: cls.retryable };
+
       } else {
         await supabaseAdmin
           .from("sales")
