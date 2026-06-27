@@ -24,7 +24,6 @@ import { Route as DashboardPixelRouteImport } from './routes/_dashboard/pixel'
 import { Route as DashboardPaymentSummaryRouteImport } from './routes/_dashboard/payment-summary'
 import { Route as DashboardFilesRouteImport } from './routes/_dashboard/files'
 import { Route as DashboardDashboardRouteImport } from './routes/_dashboard/dashboard'
-import { Route as DashboardCustomersRouteImport } from './routes/_dashboard/customers'
 import { Route as ApiPublicPaymentWebhookRouteImport } from './routes/api/public/payment-webhook'
 import { Route as DashboardReportsTrafficRouteImport } from './routes/_dashboard.reports.traffic'
 import { Route as ApiPublicHooksReconcilePendingPaymentsRouteImport } from './routes/api/public/hooks/reconcile-pending-payments'
@@ -105,11 +104,6 @@ const DashboardDashboardRoute = DashboardDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
-  id: '/customers',
-  path: '/customers',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const ApiPublicPaymentWebhookRoute = ApiPublicPaymentWebhookRouteImport.update({
   id: '/api/public/payment-webhook',
   path: '/api/public/payment-webhook',
@@ -145,7 +139,6 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/blocked': typeof BlockedRoute
   '/waiting-approval': typeof WaitingApprovalRoute
-  '/customers': typeof DashboardCustomersRoute
   '/dashboard': typeof DashboardDashboardRoute
   '/files': typeof DashboardFilesRoute
   '/payment-summary': typeof DashboardPaymentSummaryRoute
@@ -167,7 +160,6 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/blocked': typeof BlockedRoute
   '/waiting-approval': typeof WaitingApprovalRoute
-  '/customers': typeof DashboardCustomersRoute
   '/dashboard': typeof DashboardDashboardRoute
   '/files': typeof DashboardFilesRoute
   '/payment-summary': typeof DashboardPaymentSummaryRoute
@@ -191,7 +183,6 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/blocked': typeof BlockedRoute
   '/waiting-approval': typeof WaitingApprovalRoute
-  '/_dashboard/customers': typeof DashboardCustomersRoute
   '/_dashboard/dashboard': typeof DashboardDashboardRoute
   '/_dashboard/files': typeof DashboardFilesRoute
   '/_dashboard/payment-summary': typeof DashboardPaymentSummaryRoute
@@ -215,7 +206,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/blocked'
     | '/waiting-approval'
-    | '/customers'
     | '/dashboard'
     | '/files'
     | '/payment-summary'
@@ -237,7 +227,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/blocked'
     | '/waiting-approval'
-    | '/customers'
     | '/dashboard'
     | '/files'
     | '/payment-summary'
@@ -260,7 +249,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/blocked'
     | '/waiting-approval'
-    | '/_dashboard/customers'
     | '/_dashboard/dashboard'
     | '/_dashboard/files'
     | '/_dashboard/payment-summary'
@@ -398,13 +386,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardDashboardRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/_dashboard/customers': {
-      id: '/_dashboard/customers'
-      path: '/customers'
-      fullPath: '/customers'
-      preLoaderRoute: typeof DashboardCustomersRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/api/public/payment-webhook': {
       id: '/api/public/payment-webhook'
       path: '/api/public/payment-webhook'
@@ -444,7 +425,6 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardRouteChildren {
-  DashboardCustomersRoute: typeof DashboardCustomersRoute
   DashboardDashboardRoute: typeof DashboardDashboardRoute
   DashboardFilesRoute: typeof DashboardFilesRoute
   DashboardPaymentSummaryRoute: typeof DashboardPaymentSummaryRoute
@@ -457,7 +437,6 @@ interface DashboardRouteChildren {
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
-  DashboardCustomersRoute: DashboardCustomersRoute,
   DashboardDashboardRoute: DashboardDashboardRoute,
   DashboardFilesRoute: DashboardFilesRoute,
   DashboardPaymentSummaryRoute: DashboardPaymentSummaryRoute,
