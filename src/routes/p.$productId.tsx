@@ -346,10 +346,14 @@ function CheckoutPage() {
         return;
       }
 
-      trackEvent("Purchase");
+      // NOTE: do NOT fire 'Purchase' here — the gateway has only accepted
+      // the request, not confirmed payment. The real Purchase event is
+      // fired below, in the polling effect, when the sale reaches a
+      // TERMINAL_OK status. Dedup with CAPI uses `eventID = saleId`.
       setPaymentStatusMessage(
         `Pedido enviado para ${paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola"}. Digite o PIN no seu telefone para concluir o pagamento.`,
       );
+
       setPendingSaleId(result.saleId);
     } catch (error: any) {
       setPaymentErrorMessage(error?.message || "Erro inesperado ao processar pagamento.");
