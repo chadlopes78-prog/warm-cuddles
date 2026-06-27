@@ -156,13 +156,32 @@ function CheckoutPage() {
           if (TERMINAL_OK.includes(status)) {
             setPaymentConfirmed(true);
             setProcessingPayment(false);
-            setPaymentStatusMessage("Pagamento confirmado. Redirecionando para o seu acesso...");
-            const url =
+            const rawUrl =
               r?.product?.thank_you_url?.trim() ||
               r?.product?.access_link?.trim() ||
-              r?.product?.delivery_link?.trim();
+              r?.product?.delivery_link?.trim() ||
+              "";
+            // Normalize: accept "site.com/x" by prepending https:// when scheme is missing.
+            let url = rawUrl;
+            if (url && !/^[a-z][a-z0-9+.-]*:\/\//i.test(url) && !url.startsWith("/")) {
+              url = `https://${url}`;
+            }
             if (url) {
-              window.location.replace(url);
+              setPaymentStatusMessage("Pagamento confirmado. Redirecionando para o seu acesso...");
+              try {
+                // Use assign so the browser respects the new URL even if replace is blocked.
+                window.location.assign(url);
+              } catch {
+                window.location.href = url;
+              }
+              // Hard fallback if navigation is blocked or delayed.
+              setTimeout(() => {
+                if (!document.hidden) window.location.href = url;
+              }, 1500);
+            } else {
+              setPaymentStatusMessage(
+                "Pagamento confirmado com sucesso. Em instantes você receberá os detalhes de acesso.",
+              );
             }
             return;
           }
