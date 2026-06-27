@@ -366,7 +366,7 @@ function CheckoutPage() {
                   placeholder="WhatsApp (84xxxxxxx)"
                   inputMode="tel"
                   value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
+                  onChange={(e) => setContactPhone(sanitizePhone(e.target.value))}
                   className="h-12 pl-[72px] border-slate-200 rounded-xl bg-slate-50/50 text-sm font-medium placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:bg-white"
                 />
               </div>
