@@ -532,7 +532,7 @@ export const processPayment = createServerFn({ method: "POST" })
     // errors (invalid number, insufficient balance). The gateway pushes the
     // PIN to the SIM independently, so we don't need to wait for its HTTP
     // response to tell the customer to check their phone.
-    const CLIENT_WAIT_MS = 500;
+    const CLIENT_WAIT_MS = 3_000;
     const gatewaySettledPromise = earlyGatewayPromise
       .then((res) => ({ kind: "response" as const, res }))
       .catch((e) => ({ kind: "error" as const, error: e }));
