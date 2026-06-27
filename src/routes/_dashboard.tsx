@@ -21,7 +21,8 @@ import {
   AlertCircle,
   Loader2,
   Receipt,
-  PieChart
+  PieChart,
+  MessageCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -242,6 +243,7 @@ function DashboardLayout() {
     { name: "Transações", icon: Receipt, path: "/transactions" },
     { name: "Resumo por Método", icon: PieChart, path: "/payment-summary" },
     { name: "Clientes", icon: Users, path: "/customers" },
+    { name: "Recuperação de Vendas", icon: MessageCircle, path: "/recovery" },
     { name: "Pixel Facebook", icon: Target, path: "/pixel" },
     ...(profile?.role === 'admin' || isAdminEmail(user?.email) ? [{ name: "Painel Operacional", icon: ShieldCheck, path: "/admin" }] : []),
     { name: "Configurações", icon: Settings, path: "/settings" },
