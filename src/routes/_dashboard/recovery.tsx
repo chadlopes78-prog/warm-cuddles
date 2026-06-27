@@ -305,11 +305,60 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
   };
 
+  const periodLabel =
+    period === "today" ? "Hoje" :
+    period === "7d" ? "Últimos 7 dias" :
+    period === "30d" ? "Últimos 30 dias" :
+    customFrom && customTo ? `${customFrom} → ${customTo}` : "Personalizado";
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Recuperação de Vendas</h1>
-        <p className="text-muted-foreground">Recupere vendas perdidas enviando o link do checkout direto pelo WhatsApp.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Recuperação de Vendas</h1>
+          <p className="text-muted-foreground">Recupere vendas perdidas enviando o link do checkout direto pelo WhatsApp.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Hoje</SelectItem>
+              <SelectItem value="7d">Últimos 7 dias</SelectItem>
+              <SelectItem value="30d">Últimos 30 dias</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+          {period === "custom" && (
+            <>
+              <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="w-[150px]" />
+              <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="w-[150px]" />
+            </>
+          )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={resetting}>
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                Resetar Dados
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Resetar histórico de recuperação?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Isso apaga todas as tentativas de recuperação registradas e oculta os checkouts abandonados anteriores desta aba. As vendas e transações reais permanecem intactas. Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleReset} disabled={resetting}>
+                  {resetting ? "Resetando..." : "Sim, resetar"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -324,7 +373,7 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Checkouts Abandonados & Recuperados</CardTitle>
-              <CardDescription>Últimos {ABANDONED_WINDOW_DAYS} dias.</CardDescription>
+              <CardDescription>Período: {periodLabel}.</CardDescription>
             </div>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
