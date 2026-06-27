@@ -551,10 +551,12 @@ function StatCard({
   );
 }
 
-function StatusBadge({ status }: { status: RecoveryItem["status"] }) {
+function StatusBadge({ status, contactSent }: { status: RecoveryItem["status"]; contactSent?: boolean }) {
   if (status === "recovered")
     return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Recuperado</Badge>;
   if (status === "expired")
     return <Badge className="bg-slate-200 text-slate-700 hover:bg-slate-200">Expirado</Badge>;
+  if (contactSent)
+    return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Contato Enviado</Badge>;
   return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">Pendente</Badge>;
 }
