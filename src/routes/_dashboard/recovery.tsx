@@ -270,7 +270,7 @@ function RecoveryPage() {
   const handleReset = async () => {
     setResetting(true);
     try {
-      await resetHistory({});
+      await resetHistory();
       const now = new Date().toISOString();
       if (typeof window !== "undefined") {
         window.localStorage.setItem(RESET_STORAGE_KEY, now);
