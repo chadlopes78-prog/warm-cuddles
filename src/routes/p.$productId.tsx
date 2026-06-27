@@ -142,15 +142,25 @@ function CheckoutPage() {
         attempts++;
         try {
           const r = (await pollFn({ data: { saleId: pendingSaleId } })) as
-            | { sale?: { status?: string | null } | null; product?: { thank_you_url?: string | null } | null }
+            | {
+                sale?: { status?: string | null; status_reason?: string | null } | null;
+                product?: {
+                  thank_you_url?: string | null;
+                  access_link?: string | null;
+                  delivery_link?: string | null;
+                } | null;
+              }
             | null;
           if (cancelled) return;
           const status = String(r?.sale?.status ?? "").toLowerCase();
           if (TERMINAL_OK.includes(status)) {
             setPaymentConfirmed(true);
             setProcessingPayment(false);
-            setPaymentStatusMessage("Pagamento aprovado! Obrigado.");
-            const url = r?.product?.thank_you_url?.trim();
+            setPaymentStatusMessage("Pagamento confirmado. Redirecionando para o seu acesso...");
+            const url =
+              r?.product?.thank_you_url?.trim() ||
+              r?.product?.access_link?.trim() ||
+              r?.product?.delivery_link?.trim();
             if (url) {
               window.location.replace(url);
             }
@@ -159,7 +169,10 @@ function CheckoutPage() {
           if (TERMINAL_FAIL.includes(status)) {
             setProcessingPayment(false);
             setPaymentStatusMessage(null);
-            setPaymentErrorMessage("Pagamento não concluído. Tente novamente.");
+            setPaymentErrorMessage(
+              r?.sale?.status_reason ||
+                "Pagamento não confirmado. Tente novamente ou escolha outro método.",
+            );
             setPaymentErrorCode("gateway");
             setPaymentRetryable(true);
             setPendingSaleId(null);
@@ -169,6 +182,14 @@ function CheckoutPage() {
           console.error("[checkout] poll error", e);
         }
         await new Promise((r) => setTimeout(r, attempts < 25 ? 1500 : 3000));
+      }
+      if (!cancelled) {
+        setProcessingPayment(false);
+        setPaymentStatusMessage(null);
+        setPaymentErrorMessage("Pagamento não confirmado. Tente novamente ou escolha outro método.");
+        setPaymentErrorCode("timeout");
+        setPaymentRetryable(true);
+        setPendingSaleId(null);
       }
     })();
     return () => { cancelled = true; };
