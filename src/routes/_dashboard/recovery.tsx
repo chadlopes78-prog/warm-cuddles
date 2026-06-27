@@ -227,6 +227,7 @@ function RecoveryPage() {
         lastAttemptAt: reference.created_at,
         status,
         recoveredAt,
+        contactSent: Boolean(attemptAt),
       });
     }
     out.sort((a, b) => +new Date(b.lastAttemptAt) - +new Date(a.lastAttemptAt));
