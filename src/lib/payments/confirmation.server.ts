@@ -149,19 +149,23 @@ export function normalizeGatewayStatus(input: unknown, httpOk = true): Normalize
   };
   const providerParsed = nestedObject(provider, "parsed");
   const successValue = payload.success ?? payload.ok ?? data.success ?? data.ok;
+  // Prefer the real transaction object over the top-level HTTP envelope.
+  // Payflax can return `{ status: "success", transacao: { status: "pending" } }`
+  // when the PIN prompt was merely created. Treating the wrapper as terminal
+  // would approve a payment before backend confirmation, which is unsafe.
   const raw = String(
-    payload.status ??
-      payload.payment_status ??
-      payload.state ??
-      payload.result ??
+    transacao.status ??
+      transacao.payment_status ??
+      transacao.state ??
+      transacao.result ??
       data.status ??
       data.payment_status ??
       data.state ??
       data.result ??
-      transacao.status ??
-      transacao.payment_status ??
-      transacao.state ??
-      transacao.result ??
+      payload.status ??
+      payload.payment_status ??
+      payload.state ??
+      payload.result ??
       "",
   )
     .toLowerCase()
