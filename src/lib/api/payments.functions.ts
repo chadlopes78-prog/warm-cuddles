@@ -66,7 +66,10 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
     let saleRow = sale as CheckoutSaleRow & { products?: unknown };
 
     const currentStatus = String(saleRow.status ?? "").toLowerCase();
-    if (currentStatus === "pending") {
+    const currentReason = String(saleRow.status_reason ?? "").toLowerCase();
+    const canRecoverTimeoutFailure =
+      currentStatus === "failed" && /(tempo limite|timeout|não confirmado|nao confirmado|aguardando|process)/i.test(currentReason);
+    if (currentStatus === "pending" || canRecoverTimeoutFailure) {
       const reconciled = await reconcileCheckoutSaleWithGateway(saleRow).catch((e: unknown) => {
         console.error("[checkout] gateway reconciliation failed", e);
         return null;
@@ -184,7 +187,11 @@ async function fetchGatewayJson(url: string, headers: HeadersInit, timeoutMs: nu
 
 async function reconcileCheckoutSaleWithGateway(sale: CheckoutSaleRow) {
   const apiKey = process.env.PAYMENT_API_KEY || DEFAULT_API_KEY;
-  if (!apiKey || String(sale.status ?? "").toLowerCase() !== "pending") return null;
+  const localStatus = String(sale.status ?? "").toLowerCase();
+  const localReason = String(sale.status_reason ?? "").toLowerCase();
+  const recoverableTimeoutFailure =
+    localStatus === "failed" && /(tempo limite|timeout|não confirmado|nao confirmado|aguardando|process)/i.test(localReason);
+  if (!apiKey || (localStatus !== "pending" && !recoverableTimeoutFailure)) return null;
 
   const ageMs = sale.created_at ? Date.now() - new Date(sale.created_at).getTime() : 0;
   // Start reconciliation quickly, but not on the very first poll. This keeps
