@@ -181,48 +181,6 @@ function DashboardPage() {
     retry: 1,
   });
 
-  const resetData = useMutation({
-    mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
-
-      // We use the same logic as in settings but centralized here if needed
-      // Reset all user data safely
-      await supabase.from("sales").delete().eq("user_id", user.id);
-      
-      const { data: userProducts } = await supabase
-        .from("products")
-        .select("id")
-        .eq("user_id", user.id);
-      
-      const productIds = userProducts?.map(p => p.id) || [];
-
-      if (productIds.length > 0) {
-        const { data: userPages } = await supabase
-          .from("traffic_pages")
-          .select("id")
-          .in("product_id", productIds);
-        
-        const pageIds = userPages?.map(p => p.id) || [];
-        if (pageIds.length > 0) {
-          await supabase.from("traffic_events").delete().in("page_id", pageIds);
-        }
-      }
-
-      await supabase.from("notifications_log").delete().eq("user_id", user.id);
-      await supabase.from("marketing_alerts").delete().eq("user_id", user.id);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toast.success("Dados resetados com sucesso!");
-      setIsResetDialogOpen(false);
-      setResetConfirmText("");
-      refetch();
-    },
-    onError: (error: any) => {
-      toast.error("Erro ao resetar: " + error.message);
-    }
-  });
 
   const handleRangeChange = (range: { from: Date; to: Date }, newPreset: DateRangePreset) => {
     setDateRange(range);
