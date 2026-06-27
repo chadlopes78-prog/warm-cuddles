@@ -23,6 +23,7 @@ import { Route as DashboardSettingsRouteImport } from './routes/_dashboard/setti
 import { Route as DashboardRecoveryRouteImport } from './routes/_dashboard/recovery'
 import { Route as DashboardProductsRouteImport } from './routes/_dashboard/products'
 import { Route as DashboardPixelRouteImport } from './routes/_dashboard/pixel'
+import { Route as DashboardPaymentSummaryRouteImport } from './routes/_dashboard/payment-summary'
 import { Route as DashboardFilesRouteImport } from './routes/_dashboard/files'
 import { Route as DashboardDashboardRouteImport } from './routes/_dashboard/dashboard'
 import { Route as DashboardCustomersRouteImport } from './routes/_dashboard/customers'
@@ -101,6 +102,11 @@ const DashboardPixelRoute = DashboardPixelRouteImport.update({
   path: '/pixel',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardPaymentSummaryRoute = DashboardPaymentSummaryRouteImport.update({
+  id: '/payment-summary',
+  path: '/payment-summary',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardFilesRoute = DashboardFilesRouteImport.update({
   id: '/files',
   path: '/files',
@@ -156,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/customers': typeof DashboardCustomersRoute
   '/dashboard': typeof DashboardDashboardRoute
   '/files': typeof DashboardFilesRoute
+  '/payment-summary': typeof DashboardPaymentSummaryRoute
   '/pixel': typeof DashboardPixelRoute
   '/products': typeof DashboardProductsRoute
   '/recovery': typeof DashboardRecoveryRoute
@@ -179,6 +186,7 @@ export interface FileRoutesByTo {
   '/customers': typeof DashboardCustomersRoute
   '/dashboard': typeof DashboardDashboardRoute
   '/files': typeof DashboardFilesRoute
+  '/payment-summary': typeof DashboardPaymentSummaryRoute
   '/pixel': typeof DashboardPixelRoute
   '/products': typeof DashboardProductsRoute
   '/recovery': typeof DashboardRecoveryRoute
@@ -204,6 +212,7 @@ export interface FileRoutesById {
   '/_dashboard/customers': typeof DashboardCustomersRoute
   '/_dashboard/dashboard': typeof DashboardDashboardRoute
   '/_dashboard/files': typeof DashboardFilesRoute
+  '/_dashboard/payment-summary': typeof DashboardPaymentSummaryRoute
   '/_dashboard/pixel': typeof DashboardPixelRoute
   '/_dashboard/products': typeof DashboardProductsRoute
   '/_dashboard/recovery': typeof DashboardRecoveryRoute
@@ -229,6 +238,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/files'
+    | '/payment-summary'
     | '/pixel'
     | '/products'
     | '/recovery'
@@ -252,6 +262,7 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/files'
+    | '/payment-summary'
     | '/pixel'
     | '/products'
     | '/recovery'
@@ -276,6 +287,7 @@ export interface FileRouteTypes {
     | '/_dashboard/customers'
     | '/_dashboard/dashboard'
     | '/_dashboard/files'
+    | '/_dashboard/payment-summary'
     | '/_dashboard/pixel'
     | '/_dashboard/products'
     | '/_dashboard/recovery'
@@ -405,6 +417,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardPixelRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/payment-summary': {
+      id: '/_dashboard/payment-summary'
+      path: '/payment-summary'
+      fullPath: '/payment-summary'
+      preLoaderRoute: typeof DashboardPaymentSummaryRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/files': {
       id: '/_dashboard/files'
       path: '/files'
@@ -468,6 +487,7 @@ interface DashboardRouteChildren {
   DashboardCustomersRoute: typeof DashboardCustomersRoute
   DashboardDashboardRoute: typeof DashboardDashboardRoute
   DashboardFilesRoute: typeof DashboardFilesRoute
+  DashboardPaymentSummaryRoute: typeof DashboardPaymentSummaryRoute
   DashboardPixelRoute: typeof DashboardPixelRoute
   DashboardProductsRoute: typeof DashboardProductsRoute
   DashboardRecoveryRoute: typeof DashboardRecoveryRoute
@@ -480,6 +500,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCustomersRoute: DashboardCustomersRoute,
   DashboardDashboardRoute: DashboardDashboardRoute,
   DashboardFilesRoute: DashboardFilesRoute,
+  DashboardPaymentSummaryRoute: DashboardPaymentSummaryRoute,
   DashboardPixelRoute: DashboardPixelRoute,
   DashboardProductsRoute: DashboardProductsRoute,
   DashboardRecoveryRoute: DashboardRecoveryRoute,

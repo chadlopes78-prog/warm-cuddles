@@ -238,6 +238,7 @@ function DashboardLayout() {
     { name: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
     { name: "Produtos", icon: Package, path: "/products" },
     { name: "Transações", icon: Receipt, path: "/transactions" },
+    { name: "Resumo por Método", icon: PieChart, path: "/payment-summary" },
     { name: "Clientes", icon: Users, path: "/customers" },
     { name: "Pixel Facebook", icon: Target, path: "/pixel" },
     ...(profile?.role === 'admin' || isAdminEmail(user?.email) ? [{ name: "Painel Operacional", icon: ShieldCheck, path: "/admin" }] : []),
