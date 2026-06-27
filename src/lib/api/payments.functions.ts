@@ -194,9 +194,10 @@ async function reconcileCheckoutSaleWithGateway(sale: CheckoutSaleRow) {
   if (!apiKey || (localStatus !== "pending" && !recoverableTimeoutFailure)) return null;
 
   const ageMs = sale.created_at ? Date.now() - new Date(sale.created_at).getTime() : 0;
-  // Start reconciliation quickly, but not on the very first poll. This keeps
-  // checkout fast and still fixes the "processando" loop when webhook/bg fails.
-  if (ageMs < 2_500) return null;
+  // Start reconciliation almost immediately after the first checkout poll.
+  // This fixes the "processando" loop when e-Mola already confirmed on the
+  // phone but the webhook/background response has not updated the sale yet.
+  if (ageMs < 900) return null;
 
   const baseUrl = process.env.PAYMENT_API_BASE_URL || DEFAULT_BASE_URL;
   const headers = { Accept: "application/json", "X-API-Key": apiKey };
@@ -243,7 +244,7 @@ async function reconcileCheckoutSaleWithGateway(sale: CheckoutSaleRow) {
     const txLocalPhone = txPhoneDigits.startsWith("258") ? txPhoneDigits.slice(3) : txPhoneDigits;
     const txCreatedMs = tx.created_at ? new Date(String(tx.created_at)).getTime() : 0;
     const createdClose =
-      saleCreatedMs > 0 && txCreatedMs > 0 && Math.abs(txCreatedMs - saleCreatedMs) <= 120_000;
+      saleCreatedMs > 0 && txCreatedMs > 0 && Math.abs(txCreatedMs - saleCreatedMs) <= 45_000;
     return Boolean(
       methodMatches &&
         Number.isFinite(txAmount) &&
