@@ -19,6 +19,9 @@ const PaymentSuccessInput = z.object({
   saleId: z.string().uuid(),
 });
 
+const PAYMENT_SUCCESS_SELECT =
+  "id, status, status_reason, created_at, payment_method, amount, customer_phone, transaction_id, payment_reference, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)";
+
 export type PaymentErrorCode =
   | "invalid_phone"
   | "method_mismatch"
@@ -51,9 +54,7 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let { data: sale, error } = await supabaseAdmin
       .from("sales")
-      .select(
-        "id, status, status_reason, created_at, payment_method, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)",
-      )
+      .select(PAYMENT_SUCCESS_SELECT)
       .eq("id", data.saleId)
       .maybeSingle();
 
@@ -62,31 +63,39 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
       throw new Error("Não foi possível consultar o estado do pagamento.");
     }
     if (!sale) return { sale: null, product: null };
+    let saleRow = sale as CheckoutSaleRow & { products?: unknown };
 
-    const currentStatus = String(sale.status ?? "").toLowerCase();
-    const pendingAgeMs = sale.created_at ? Date.now() - new Date(sale.created_at).getTime() : 0;
-    if (currentStatus === "pending" && pendingAgeMs > 6 * 60_000) {
+    const currentStatus = String(saleRow.status ?? "").toLowerCase();
+    if (currentStatus === "pending") {
+      const reconciled = await reconcileCheckoutSaleWithGateway(saleRow).catch((e: unknown) => {
+        console.error("[checkout] gateway reconciliation failed", e);
+        return null;
+      });
+      if (reconciled) saleRow = reconciled as CheckoutSaleRow & { products?: unknown };
+    }
+
+    const statusAfterReconcile = String(saleRow.status ?? "").toLowerCase();
+    const pendingAgeMs = saleRow.created_at ? Date.now() - new Date(saleRow.created_at).getTime() : 0;
+    if (statusAfterReconcile === "pending" && pendingAgeMs > 6 * 60_000) {
       const { markSaleTerminalFailure } = await import("@/lib/payments/confirmation.server");
       await markSaleTerminalFailure({
-        saleId: sale.id,
+        saleId: saleRow.id,
         status: "expired",
         reason: "Pagamento não confirmado dentro do tempo limite. Tente novamente ou escolha outro método.",
-        method: sale.payment_method ?? null,
-      }).catch((e) => console.error("[checkout] auto-expire pending sale failed", e));
+        method: saleRow.payment_method ?? null,
+      }).catch((e: unknown) => console.error("[checkout] auto-expire pending sale failed", e));
 
       const refreshed = await supabaseAdmin
         .from("sales")
-        .select(
-          "id, status, status_reason, created_at, payment_method, products(id, access_link, delivery_link, support_phone, support_number, thank_you_button_text, thank_you_url)",
-        )
+        .select(PAYMENT_SUCCESS_SELECT)
         .eq("id", data.saleId)
         .maybeSingle();
-      if (!refreshed.error && refreshed.data) sale = refreshed.data;
+      if (!refreshed.error && refreshed.data) saleRow = refreshed.data as CheckoutSaleRow & { products?: unknown };
     }
 
-    const status = String(sale.status ?? "").toLowerCase();
+    const status = String(saleRow.status ?? "").toLowerCase();
     const isPaid = ["paid", "approved", "success", "completed"].includes(status);
-    const product = sale.products as {
+    const product = saleRow.products as {
       access_link?: string | null;
       delivery_link?: string | null;
       support_phone?: string | null;
@@ -96,7 +105,7 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
     } | null;
 
     return {
-      sale: { status: sale.status, status_reason: sale.status_reason },
+      sale: { status: saleRow.status, status_reason: saleRow.status_reason },
       product: product
         ? {
             access_link: isPaid ? product.access_link : null,
@@ -109,6 +118,162 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
         : null,
     };
   });
+
+type CheckoutSaleRow = {
+  id: string;
+  status?: string | null;
+  status_reason?: string | null;
+  created_at?: string | null;
+  payment_method?: string | null;
+  amount?: number | string | null;
+  customer_phone?: string | null;
+  transaction_id?: string | null;
+  payment_reference?: string | null;
+  products?: unknown;
+};
+
+type GatewayRecord = Record<string, unknown>;
+
+function record(value: unknown): GatewayRecord {
+  return value && typeof value === "object" ? (value as GatewayRecord) : {};
+}
+
+function gatewayRecordsFromPayload(payload: unknown): GatewayRecord[] {
+  if (Array.isArray(payload)) return payload.filter((item): item is GatewayRecord => !!item && typeof item === "object");
+
+  const root = record(payload);
+  const data = record(root.data);
+  const candidates = [
+    root.transactions,
+    root.transacoes,
+    root.items,
+    root.results,
+    root.data,
+    data.transactions,
+    data.transacoes,
+    data.items,
+    data.results,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.filter((item): item is GatewayRecord => !!item && typeof item === "object");
+    }
+  }
+
+  const transaction = record(root.transacao);
+  if (Object.keys(transaction).length > 0) return [transaction];
+  if (root.id || root.status || root.transaction_reference || root.reference) return [root];
+  return [];
+}
+
+async function fetchGatewayJson(url: string, headers: HeadersInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { headers, signal: controller.signal });
+    if (!res.ok) return null;
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function reconcileCheckoutSaleWithGateway(sale: CheckoutSaleRow) {
+  const apiKey = process.env.PAYMENT_API_KEY || DEFAULT_API_KEY;
+  if (!apiKey || String(sale.status ?? "").toLowerCase() !== "pending") return null;
+
+  const ageMs = sale.created_at ? Date.now() - new Date(sale.created_at).getTime() : 0;
+  // Start reconciliation quickly, but not on the very first poll. This keeps
+  // checkout fast and still fixes the "processando" loop when webhook/bg fails.
+  if (ageMs < 2_500) return null;
+
+  const baseUrl = process.env.PAYMENT_API_BASE_URL || DEFAULT_BASE_URL;
+  const headers = { Accept: "application/json", "X-API-Key": apiKey };
+  const {
+    confirmSalePayment,
+    markSaleTerminalFailure,
+    normalizeGatewayStatus,
+    pendingReasonForMethod,
+    readGatewayMessage,
+    readGatewayReference,
+    readGatewayTransactionId,
+  } = await import("@/lib/payments/confirmation.server");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  const localRef = sale.payment_reference ? String(sale.payment_reference) : "";
+  const localTx = sale.transaction_id ? String(sale.transaction_id) : "";
+  const matchesSale = (tx: GatewayRecord) => {
+    const txRef = readGatewayReference(tx) ?? "";
+    const txId = readGatewayTransactionId(tx) ?? "";
+    return Boolean(
+      (localRef && (txRef === localRef || txId === localRef)) ||
+        (localTx && (txRef === localTx || txId === localTx)),
+    );
+  };
+
+  let gatewayTx: GatewayRecord | null = null;
+
+  if (localTx) {
+    const detail = await fetchGatewayJson(
+      joinUrl(baseUrl, `/api/transactions/${encodeURIComponent(localTx)}`),
+      headers,
+      1_500,
+    );
+    gatewayTx = gatewayRecordsFromPayload(detail).find(matchesSale) ?? null;
+  }
+
+  if (!gatewayTx && localRef) {
+    const list = await fetchGatewayJson(joinUrl(baseUrl, "/api/transactions"), headers, 2_500);
+    gatewayTx = gatewayRecordsFromPayload(list).find(matchesSale) ?? null;
+  }
+
+  if (!gatewayTx) return null;
+
+  const finalStatus = normalizeGatewayStatus(gatewayTx, true);
+  const transactionId = readGatewayTransactionId(gatewayTx);
+  const reference = readGatewayReference(gatewayTx) || localRef || null;
+
+  if (finalStatus === "paid") {
+    await confirmSalePayment({
+      saleId: sale.id,
+      transactionId,
+      reference,
+      rawPayload: gatewayTx,
+      triggerPushcut: true,
+    });
+  } else if (finalStatus === "failed" || finalStatus === "expired") {
+    await markSaleTerminalFailure({
+      saleId: sale.id,
+      status: finalStatus,
+      transactionId,
+      reference,
+      reason: readGatewayMessage(gatewayTx) || "Pagamento recusado pelo gateway.",
+      method: sale.payment_method ?? null,
+    });
+  } else if (transactionId || reference) {
+    await supabaseAdmin
+      .from("sales")
+      .update({
+        ...(transactionId ? { transaction_id: transactionId.slice(0, 200) } : {}),
+        ...(reference ? { payment_reference: reference.slice(0, 200) } : {}),
+        status_reason: pendingReasonForMethod(sale.payment_method ?? null, "processing").label,
+      })
+      .eq("id", sale.id)
+      .eq("status", "pending");
+  }
+
+  const refreshed = await supabaseAdmin
+    .from("sales")
+    .select(PAYMENT_SUCCESS_SELECT)
+    .eq("id", sale.id)
+    .maybeSingle();
+
+  return refreshed.error ? null : refreshed.data;
+}
 
 function normalizeMozambicanPhone(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -133,7 +298,7 @@ function configuredPublicUrl() {
   return raw ? raw.replace(/\/+$/, "") : "";
 }
 
-function configuredWebhookUrl() {
+function configuredWebhookUrl(requestOrigin = "") {
   const explicit = process.env.PAYMENT_WEBHOOK_URL || process.env.PAYMENT_CALLBACK_URL || "";
   const secret = process.env.PAYMENT_WEBHOOK_SECRET || "";
   const appendSecret = (url: string) => {
@@ -163,7 +328,8 @@ function configuredWebhookUrl() {
   }
 
   const publicUrl = configuredPublicUrl();
-  return publicUrl ? appendSecret(`${publicUrl}/api/public/payment-webhook`) : "";
+  const origin = publicUrl || requestOrigin.replace(/\/+$/, "");
+  return origin ? appendSecret(`${origin}/api/public/payment-webhook`) : "";
 }
 
 export const processPayment = createServerFn({ method: "POST" })
@@ -211,6 +377,14 @@ export const processPayment = createServerFn({ method: "POST" })
       readGatewayTransactionId,
       pendingReasonForMethod,
     } = confirmationMod;
+
+    let requestOrigin = "";
+    try {
+      const { getRequestUrl } = await import("@tanstack/react-start/server");
+      requestOrigin = getRequestUrl({ xForwardedHost: true, xForwardedProto: true }).origin;
+    } catch {
+      requestOrigin = "";
+    }
 
     const isUuid =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -365,7 +539,7 @@ export const processPayment = createServerFn({ method: "POST" })
       payout_method: payoutMethod,
       transaction_reference: reference,
     };
-    const callbackUrl = configuredWebhookUrl();
+    const callbackUrl = configuredWebhookUrl(requestOrigin);
     if (callbackUrl) earlyBody.callback_url = callbackUrl;
     if (gatewayMethod === "emola_c2b") earlyBody.name = customerName.slice(0, 60);
 
@@ -469,7 +643,7 @@ export const processPayment = createServerFn({ method: "POST" })
             ? ((txEnvelope.id as string | undefined) ??
               (txEnvelope.transaction_reference as string | undefined))
             : null) ?? readGatewayTransactionId(json);
-        const finalStatus = normalizeGatewayStatus(txEnvelope ?? json, res.ok);
+        const finalStatus = normalizeGatewayStatus(json ?? txEnvelope, res.ok);
 
         if (finalStatus === "paid") {
           await confirmSalePayment({
@@ -546,7 +720,9 @@ export const processPayment = createServerFn({ method: "POST" })
     if (raceResult.kind === "timeout") {
       // Detach: finish gateway handling in background, return success now.
       console.info("[perf] client wait elapsed; detaching gateway", { reqId, saleId: sale.id });
-      void processGatewayResult(earlyGatewayPromise);
+      const bgTask = processGatewayResult(earlyGatewayPromise);
+      const { waitUntil } = await import("@/lib/runtime/wait-until.server");
+      if (!waitUntil(bgTask)) void bgTask;
       return { success: true, saleId: sale.id, transactionId: null };
     }
 
@@ -580,7 +756,7 @@ export const processPayment = createServerFn({ method: "POST" })
         ? ((txEnvelope.id as string | undefined) ??
           (txEnvelope.transaction_reference as string | undefined))
         : null) ?? readGatewayTransactionId(json);
-    const finalStatus = normalizeGatewayStatus(txEnvelope ?? json, res.ok);
+    const finalStatus = normalizeGatewayStatus(json ?? txEnvelope, res.ok);
 
     try {
       if (finalStatus === "paid") {

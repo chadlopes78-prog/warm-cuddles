@@ -53,6 +53,47 @@ function nestedObject(payload: GatewayPayload, key: string): GatewayPayload {
   return asObject(payload[key]);
 }
 
+function gatewayStepPayload(payload: GatewayPayload, key: string): GatewayPayload {
+  const step = nestedObject(payload, key);
+  const parsed = nestedObject(step, "parsed");
+  return { ...step, ...parsed };
+}
+
+function isGatewayStepSuccess(step: GatewayPayload) {
+  const errorCode = String(step.errorCode ?? step.error_code ?? step.output_ResponseCode ?? step.code ?? "")
+    .toLowerCase()
+    .trim();
+  const message = String(
+    step.message ?? step.output_ResponseDesc ?? step.description ?? step.status ?? step.result ?? "",
+  ).toLowerCase();
+
+  return (
+    errorCode === "0" ||
+    errorCode === "ins-0" ||
+    /\bsuccess(?:ful|fully)?\b|sucesso|completed|aprovad|confirmad/.test(message)
+  );
+}
+
+function hasPayflaxSettlementSuccess(payload: GatewayPayload, data: GatewayPayload, transacao: GatewayPayload) {
+  const scopes = [payload, data, transacao];
+  const payoutSuccess = scopes.some((scope) => isGatewayStepSuccess(gatewayStepPayload(scope, "payout_result")));
+  const feeSuccess = scopes.some(
+    (scope) =>
+      isGatewayStepSuccess(gatewayStepPayload(scope, "fee_result_1")) ||
+      isGatewayStepSuccess(gatewayStepPayload(scope, "fee_result")) ||
+      isGatewayStepSuccess(gatewayStepPayload(scope, "fee_result_2")),
+  );
+  const hasPayoutAmount = scopes.some((scope) => {
+    const value = Number(scope.payout_amount ?? scope.net_amount ?? scope.received_amount ?? 0);
+    return Number.isFinite(value) && value > 0;
+  });
+
+  // Payflax can leave `transacao.status` as pending even after the wallet
+  // collection, fee and payout steps return errorCode "0" / "Successfully".
+  // At that point money has already moved, so the checkout must release access.
+  return payoutSuccess && (feeSuccess || hasPayoutAmount);
+}
+
 export function paymentReferenceForSale(saleId: string) {
   return `PMZ${saleId.replace(/[^a-zA-Z0-9]/g, "")}`.slice(0, 20);
 }
@@ -215,6 +256,10 @@ export function normalizeGatewayStatus(input: unknown, httpOk = true): Normalize
     /(recus|reject|declin|cancel|fail|erro|expir)/i.test(message)
   ) {
     return message.includes("expir") ? "expired" : "failed";
+  }
+
+  if (httpOk && hasPayflaxSettlementSuccess(payload, data, transacao)) {
+    return "paid";
   }
 
   return "pending";
