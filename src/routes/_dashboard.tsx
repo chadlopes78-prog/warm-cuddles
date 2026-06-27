@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { subscribeToPushNotifications } from "@/lib/push-notifications";
 import { isAdminEmail } from "@/lib/admins";
+import { ThemeToggle } from "@/components/ThemeProvider";
 
 export const Route = createFileRoute("/_dashboard")({
   component: DashboardLayoutWrapper,
@@ -282,8 +283,8 @@ function DashboardLayout() {
                 <button
                   onClick={() => toggleMenu(item.name)}
                   className={cn(
-                    "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-100",
-                    isActive ? "bg-primary/5 text-primary" : "text-slate-600",
+                    "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent",
+                    isActive ? "bg-accent text-foreground" : "text-muted-foreground",
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -299,24 +300,24 @@ function DashboardLayout() {
                   to={item.path}
                   
                   className={cn(
-                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all hover:bg-slate-100 active:scale-95",
-                    isActive ? "bg-slate-100 text-slate-900" : "text-slate-600",
+                    "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all hover:bg-accent active:scale-95",
+                    isActive ? "bg-accent text-foreground" : "text-muted-foreground",
                   )}
                 >
-                  <item.icon className={cn("h-5 w-5 shrink-0", isActive ? "text-slate-900" : "text-slate-500")} />
+                  <item.icon className={cn("h-5 w-5 shrink-0", isActive ? "text-foreground" : "text-muted-foreground")} />
                   {(isSidebarOpen || isMobileMenuOpen) && <span>{item.name}</span>}
                 </Link>
               )}
 
               {hasSubItems && isExpanded && (isSidebarOpen || isMobileMenuOpen) && (
-                <div className="ml-4 space-y-1 border-l pl-4">
+                <div className="ml-4 space-y-1 border-l border-border pl-4">
                   {subItems!.map((subItem) => (
                     <Link
                       key={subItem.path}
                       to={subItem.path}
                       className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-slate-100",
-                        location.pathname === subItem.path ? "bg-primary/5 text-primary" : "text-slate-600",
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent",
+                        location.pathname === subItem.path ? "bg-accent text-foreground" : "text-muted-foreground",
                       )}
                     >
                       <subItem.icon className="h-4 w-4 shrink-0" />
@@ -332,16 +333,24 @@ function DashboardLayout() {
 
       <div className="p-3">
         <Separator className="mb-3" />
+        {(isSidebarOpen || isMobileMenuOpen) ? (
+          <div className="mb-2 flex items-center justify-between rounded-lg px-3 py-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tema</span>
+            <ThemeToggle />
+          </div>
+        ) : (
+          <div className="mb-2 flex justify-center"><ThemeToggle /></div>
+        )}
         <button
           onClick={handleSignOut}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <LogOut className="h-5 w-5 shrink-0" />
           {(isSidebarOpen || isMobileMenuOpen) && <span>Sair</span>}
         </button>
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="mt-2 hidden lg:flex w-full items-center justify-center rounded-lg p-2 text-slate-400 hover:bg-slate-100"
+          className="mt-2 hidden lg:flex w-full items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-accent"
         >
           {isSidebarOpen ? (
             <ChevronLeft className="h-4 w-4" />
@@ -354,22 +363,25 @@ function DashboardLayout() {
   );
 
   return (
-    <div className="flex min-h-screen bg-slate-50/50">
-      <div className="fixed top-0 left-0 right-0 z-50 flex h-16 items-center justify-between border-b bg-white px-4 lg:hidden">
+    <div className="flex min-h-screen bg-background text-foreground">
+      <div className="fixed top-0 left-0 right-0 z-50 flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
         <Link to="/dashboard" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-black border border-slate-800 shadow-sm">
-            <span className="text-lg font-black text-white">P</span>
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-sm">
+            <span className="text-lg font-black text-primary-foreground">P</span>
           </div>
           <span className="text-lg font-bold tracking-tight">Paymentblack</span>
         </Link>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="rounded-full hover:bg-slate-100"
-        >
-          {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="rounded-full hover:bg-accent"
+          >
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </Button>
+        </div>
       </div>
 
       {isMobileMenuOpen && (
@@ -381,7 +393,7 @@ function DashboardLayout() {
 
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 h-screen w-64 border-r bg-white transition-transform duration-300 lg:hidden",
+          "fixed left-0 top-0 z-50 h-screen w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform duration-300 lg:hidden",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -390,7 +402,7 @@ function DashboardLayout() {
 
       <aside
         className={cn(
-          "fixed left-0 top-0 z-40 hidden h-screen border-r bg-white transition-all duration-300 lg:block",
+          "fixed left-0 top-0 z-40 hidden h-screen border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-300 lg:block",
           isSidebarOpen ? "w-64" : "w-20",
         )}
       >
