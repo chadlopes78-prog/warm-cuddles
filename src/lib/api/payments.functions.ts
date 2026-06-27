@@ -258,17 +258,25 @@ async function reconcileCheckoutSaleWithGateway(sale: CheckoutSaleRow) {
 
   let gatewayTx: GatewayRecord | null = null;
 
+  // Coalesce concurrent pollers onto a single in-flight gateway request and
+  // cache for a sub-poll window so N simultaneous checkouts never fan out to
+  // N upstream calls for identical payloads. Pure infra optimization — same
+  // payload shape returned as a raw fetch.
+  const { coalesceTtl } = await import("@/lib/runtime/coalesce-ttl.server");
+
   if (localTx) {
-    const detail = await fetchGatewayJson(
-      joinUrl(baseUrl, `/api/transactions/${encodeURIComponent(localTx)}`),
-      headers,
-      1_500,
+    const detailUrl = joinUrl(baseUrl, `/api/transactions/${encodeURIComponent(localTx)}`);
+    const detail = await coalesceTtl(`gw:tx:${localTx}`, 1_000, () =>
+      fetchGatewayJson(detailUrl, headers, 1_500),
     );
     gatewayTx = gatewayRecordsFromPayload(detail).find(matchesSale) ?? null;
   }
 
   if (!gatewayTx) {
-    const list = await fetchGatewayJson(joinUrl(baseUrl, "/api/transactions"), headers, 2_500);
+    const listUrl = joinUrl(baseUrl, "/api/transactions");
+    const list = await coalesceTtl("gw:tx:list", 1_500, () =>
+      fetchGatewayJson(listUrl, headers, 2_500),
+    );
     gatewayTx = gatewayRecordsFromPayload(list).find(matchesSale) ?? null;
   }
 
