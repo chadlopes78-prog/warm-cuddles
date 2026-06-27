@@ -369,129 +369,145 @@ export const processPayment = createServerFn({ method: "POST" })
 
     console.info("[perf] processPayment pre-gateway", { ms: Date.now() - t0, saleId: sale.id });
 
-    try {
-      // Retry on transient gateway errors (network/timeout/5xx).
-      // Up to 3 attempts with short backoff. PIN-bearing requests use
-      // a generous timeout so customers have time to confirm on the phone.
-      const MAX_ATTEMPTS = 3;
-      let res: Response | null = null;
-      let text = "";
-      let lastErr: unknown = null;
-
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        // First attempt: reuse the in-flight early-fire request started in
-        // parallel with the sale INSERT (both methods). The PIN has already
-        // been pushed to the customer while the DB write was happening.
-        if (attempt === 1) {
-          try {
-            res = await earlyGatewayPromise;
-            text = await res.text();
-            clearTimeout(earlyTimeoutId);
-            console.info("[perf] gateway responded", {
-              reqId, saleId: sale.id, status: res.status,
-              gatewayMs: Date.now() - tGwSent, totalMs: Date.now() - t0,
-            });
-            if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
-              console.warn("[gateway] 5xx, retrying", { attempt, status: res.status });
-              await new Promise((r) => setTimeout(r, 400 * attempt));
-              continue;
-            }
-            break;
-          } catch (e) {
-            clearTimeout(earlyTimeoutId);
-            lastErr = e;
-            const aborted = (e as { name?: string })?.name === "AbortError";
-            console.warn("[gateway] early-fire network/timeout", {
-              reqId, aborted, err: (e as Error)?.message,
-            });
-            if (attempt < MAX_ATTEMPTS) {
-              await new Promise((r) => setTimeout(r, 400 * attempt));
-              continue;
-            }
-            throw e;
-          }
-        }
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 90_000);
-        const tRetry = Date.now();
-        try {
-          res = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json; charset=utf-8",
-              Accept: "application/json",
-              Connection: "keep-alive",
-              "User-Agent": "PagamentosMZ/1.0",
-              "X-Request-Id": reqId,
-              "X-Idempotency-Key": saleId,
-            },
-            body: JSON.stringify(earlyBody),
-            signal: controller.signal,
-            keepalive: true,
-          });
-          text = await res.text();
-          console.info("[perf] gateway retry responded", {
-            reqId, attempt, status: res.status, ms: Date.now() - tRetry,
-          });
-          // Retry only on server-side faults; don't replay a 2xx/4xx (PIN already pushed).
-          if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
-            console.warn("[gateway] 5xx, retrying", { attempt, status: res.status });
-            await new Promise((r) => setTimeout(r, 400 * attempt));
-            continue;
-          }
-          break;
-        } catch (e) {
-          lastErr = e;
-          const aborted = (e as { name?: string })?.name === "AbortError";
-          console.warn("[gateway] network/timeout", {
-            reqId, attempt, aborted, err: (e as Error)?.message,
-          });
-          if (attempt < MAX_ATTEMPTS) {
-            await new Promise((r) => setTimeout(r, 400 * attempt));
-            continue;
-          }
-          throw e;
-        } finally {
-          clearTimeout(timeoutId);
-        }
-      }
-
-      if (!res) throw lastErr ?? new Error("Gateway sem resposta");
-
-      let json: Record<string, unknown> | null = null;
+    // Background processor: awaits the gateway response (which may block for the
+    // full PIN window) and finalizes the sale. Returns nothing — failures are
+    // logged and the sale stays "pending" so the webhook / reconciler can finish.
+    const processGatewayResult = async (gatewayPromise: Promise<Response>) => {
       try {
-        json = text ? JSON.parse(text) : null;
-      } catch {
-        json = { raw: text };
+        const res = await gatewayPromise;
+        const text = await res.text();
+        clearTimeout(earlyTimeoutId);
+        console.info("[perf] gateway responded (bg)", {
+          reqId, saleId: sale.id, status: res.status,
+          gatewayMs: Date.now() - tGwSent, totalMs: Date.now() - t0,
+        });
+
+        let json: Record<string, unknown> | null = null;
+        try { json = text ? JSON.parse(text) : null; } catch { json = { raw: text }; }
+
+        console.info("payflax response", {
+          reqId, status: res.status, method: gatewayMethod, endpoint, reference,
+          body: text?.slice(0, 800),
+        });
+
+        const txEnvelope =
+          json && typeof json === "object" && "transacao" in json
+            ? ((json as Record<string, unknown>).transacao as Record<string, unknown>)
+            : json;
+        const transactionId =
+          (txEnvelope && typeof txEnvelope === "object"
+            ? ((txEnvelope.id as string | undefined) ??
+              (txEnvelope.transaction_reference as string | undefined))
+            : null) ?? readGatewayTransactionId(json);
+        const finalStatus = normalizeGatewayStatus(txEnvelope ?? json, res.ok);
+
+        if (finalStatus === "paid") {
+          await confirmSalePayment({
+            saleId: sale.id,
+            transactionId: transactionId ? String(transactionId) : null,
+            reference,
+            rawPayload: json,
+            triggerPushcut: true,
+          });
+        } else if (finalStatus === "failed" || finalStatus === "expired") {
+          const messageSource =
+            (txEnvelope as Record<string, unknown> | null) ?? (json as Record<string, unknown>);
+          const message =
+            readGatewayMessage(messageSource) ||
+            messageSource?.message || messageSource?.error || messageSource?.detail ||
+            (finalStatus === "expired" ? "Pagamento expirado." : "Pagamento recusado pelo gateway.");
+          await markSaleTerminalFailure({
+            saleId: sale.id,
+            status: finalStatus,
+            transactionId: transactionId ? String(transactionId) : null,
+            reference,
+            reason: String(message),
+            method: gatewayMethod,
+          });
+        } else {
+          await supabaseAdmin
+            .from("sales")
+            .update({
+              status: "pending",
+              status_reason: pendingReasonForMethod(gatewayMethod, "processing").label,
+              transaction_id: transactionId ? String(transactionId).slice(0, 200) : null,
+              payment_reference: reference,
+            })
+            .eq("id", sale.id)
+            .neq("status", "paid");
+        }
+      } catch (err) {
+        clearTimeout(earlyTimeoutId);
+        console.error("[gateway] bg processor error", err);
+        // Leave sale as pending; webhook / reconciler will resolve it.
+        await supabaseAdmin
+          .from("sales")
+          .update({
+            status: "pending",
+            status_reason: pendingReasonForMethod(gatewayMethod, "awaiting_customer").label,
+            payment_reference: reference,
+          })
+          .neq("status", "paid")
+          .eq("id", sale.id)
+          .then(undefined, () => {});
       }
+    };
 
-      console.info("payflax response", {
-        reqId,
-        status: res.status,
-        method: gatewayMethod,
-        endpoint,
-        reference,
-        body: text?.slice(0, 800),
+    // Race the gateway against a short client-facing budget. If the gateway
+    // replies quickly with a terminal error (insufficient balance, invalid
+    // number, etc.) we surface it to the customer. If it stays open waiting
+    // for the PIN, we return success with the saleId so the client can poll
+    // payment-success and avoid Safari's ~60s "Load failed" abort.
+    const CLIENT_WAIT_MS = 20_000;
+    const raceResult = await Promise.race([
+      earlyGatewayPromise.then(async (res) => {
+        const text = await res.text();
+        return { kind: "response" as const, res, text };
+      }).catch((e) => ({ kind: "error" as const, error: e })),
+      new Promise<{ kind: "timeout" }>((resolve) =>
+        setTimeout(() => resolve({ kind: "timeout" }), CLIENT_WAIT_MS),
+      ),
+    ]);
+
+    if (raceResult.kind === "timeout") {
+      // Detach: finish gateway handling in background, return success now.
+      console.info("[perf] client wait elapsed; detaching gateway", { reqId, saleId: sale.id });
+      void processGatewayResult(earlyGatewayPromise);
+      return { success: true, saleId: sale.id, transactionId: null };
+    }
+
+    if (raceResult.kind === "error") {
+      clearTimeout(earlyTimeoutId);
+      console.warn("[gateway] early-fire failed fast", {
+        reqId, err: (raceResult.error as Error)?.message,
       });
+      // Keep sale pending; webhook/reconciler can still resolve it.
+      return { success: true, saleId: sale.id, transactionId: null };
+    }
 
+    // Got a synchronous gateway response within the budget.
+    clearTimeout(earlyTimeoutId);
+    const { res, text } = raceResult;
+    let json: Record<string, unknown> | null = null;
+    try { json = text ? JSON.parse(text) : null; } catch { json = { raw: text }; }
 
+    console.info("payflax response", {
+      reqId, status: res.status, method: gatewayMethod, endpoint, reference,
+      body: text?.slice(0, 800),
+    });
 
+    const txEnvelope =
+      json && typeof json === "object" && "transacao" in json
+        ? ((json as Record<string, unknown>).transacao as Record<string, unknown>)
+        : json;
+    const transactionId =
+      (txEnvelope && typeof txEnvelope === "object"
+        ? ((txEnvelope.id as string | undefined) ??
+          (txEnvelope.transaction_reference as string | undefined))
+        : null) ?? readGatewayTransactionId(json);
+    const finalStatus = normalizeGatewayStatus(txEnvelope ?? json, res.ok);
 
-      // Payflax wraps result under `transacao`
-      const txEnvelope =
-        json && typeof json === "object" && "transacao" in json
-          ? ((json as Record<string, unknown>).transacao as Record<string, unknown>)
-          : json;
-
-      const transactionId =
-        (txEnvelope && typeof txEnvelope === "object"
-          ? ((txEnvelope.id as string | undefined) ??
-            (txEnvelope.transaction_reference as string | undefined))
-          : null) ?? readGatewayTransactionId(json);
-
-      const finalStatus = normalizeGatewayStatus(txEnvelope ?? json, res.ok);
-
+    try {
       if (finalStatus === "paid") {
         await confirmSalePayment({
           saleId: sale.id,
@@ -505,9 +521,7 @@ export const processPayment = createServerFn({ method: "POST" })
           (txEnvelope as Record<string, unknown> | null) ?? (json as Record<string, unknown>);
         const message =
           readGatewayMessage(messageSource) ||
-          messageSource?.message ||
-          messageSource?.error ||
-          messageSource?.detail ||
+          messageSource?.message || messageSource?.error || messageSource?.detail ||
           (finalStatus === "expired" ? "Pagamento expirado." : "Pagamento recusado pelo gateway.");
         await markSaleTerminalFailure({
           saleId: sale.id,
@@ -519,7 +533,6 @@ export const processPayment = createServerFn({ method: "POST" })
         });
         const cls = classifyError(String(message));
         return { success: false, saleId: sale.id, error: String(message), code: cls.code, retryable: cls.retryable };
-
       } else {
         await supabaseAdmin
           .from("sales")
@@ -532,23 +545,13 @@ export const processPayment = createServerFn({ method: "POST" })
           .eq("id", sale.id)
           .neq("status", "paid");
       }
-
-      return {
-        success: true,
-        saleId: sale.id,
-        transactionId: transactionId ? String(transactionId) : null,
-      };
-    } catch (err: unknown) {
-      console.error("processPayment error", err);
-      await supabaseAdmin
-        .from("sales")
-        .update({
-          status: "pending",
-          status_reason: pendingReasonForMethod(gatewayMethod, "awaiting_customer").label,
-          payment_reference: reference,
-        })
-        .neq("status", "paid")
-        .eq("id", sale.id);
-      return { success: true, saleId: sale.id, transactionId: null };
+    } catch (err) {
+      console.error("processPayment finalize error", err);
     }
+
+    return {
+      success: true,
+      saleId: sale.id,
+      transactionId: transactionId ? String(transactionId) : null,
+    };
   });
