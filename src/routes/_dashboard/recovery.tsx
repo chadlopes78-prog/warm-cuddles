@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { MessageSquare, MessageCircle, CheckCircle2, Clock, TrendingUp, Search } from "lucide-react";
+import { MessageSquare, MessageCircle, CheckCircle2, Clock, TrendingUp, Search, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -16,11 +16,27 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { logRecoveryAttempt } from "@/lib/api/recovery.functions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import { logRecoveryAttempt, resetRecoveryHistory } from "@/lib/api/recovery.functions";
 
 export const Route = createFileRoute("/_dashboard/recovery")({
   component: RecoveryPage,
 });
+
+const RESET_STORAGE_KEY = "recovery:reset_at";
+type Period = "today" | "7d" | "30d" | "custom";
 
 const SUCCESS_STATUSES = ["approved", "paid", "success"];
 const ABANDONED_WINDOW_DAYS = 30;
@@ -79,7 +95,39 @@ function timeAgo(iso: string) {
 
 function RecoveryPage() {
   const [search, setSearch] = useState("");
+  const [period, setPeriod] = useState<Period>("30d");
+  const [customFrom, setCustomFrom] = useState<string>("");
+  const [customTo, setCustomTo] = useState<string>("");
+  const [resetAt, setResetAt] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
   const logAttempt = useServerFn(logRecoveryAttempt);
+  const resetHistory = useServerFn(resetRecoveryHistory);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setResetAt(window.localStorage.getItem(RESET_STORAGE_KEY));
+    }
+  }, []);
+
+  const periodRange = useMemo(() => {
+    const now = new Date();
+    if (period === "today") {
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      return { from: start, to: now };
+    }
+    if (period === "7d") {
+      return { from: new Date(now.getTime() - 7 * 86400_000), to: now };
+    }
+    if (period === "30d") {
+      return { from: new Date(now.getTime() - 30 * 86400_000), to: now };
+    }
+    // custom
+    const from = customFrom ? new Date(`${customFrom}T00:00:00`) : new Date(now.getTime() - 30 * 86400_000);
+    const to = customTo ? new Date(`${customTo}T23:59:59`) : now;
+    return { from, to };
+  }, [period, customFrom, customTo]);
+
 
   const { data: sales = [], isLoading } = useQuery({
     queryKey: ["recovery-sales"],
@@ -184,7 +232,18 @@ function RecoveryPage() {
     return out;
   }, [sales, firstAttemptByKey]);
 
-  const filtered = items.filter((i) => {
+  const periodItems = useMemo(() => {
+    const resetTs = resetAt ? +new Date(resetAt) : 0;
+    const fromTs = +periodRange.from;
+    const toTs = +periodRange.to;
+    return items.filter((i) => {
+      const t = +new Date(i.lastAttemptAt);
+      if (t < resetTs) return false;
+      return t >= fromTs && t <= toTs;
+    });
+  }, [items, periodRange, resetAt]);
+
+  const filtered = periodItems.filter((i) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
@@ -195,8 +254,8 @@ function RecoveryPage() {
   });
 
   const stats = useMemo(() => {
-    const abandoned = items.filter((i) => i.status === "pending" || i.status === "expired");
-    const recovered = items.filter((i) => i.status === "recovered");
+    const abandoned = periodItems.filter((i) => i.status === "pending" || i.status === "expired");
+    const recovered = periodItems.filter((i) => i.status === "recovered");
     const recoveredValue = recovered.reduce((sum, i) => sum + i.amount, 0);
     const total = abandoned.length + recovered.length;
     const rate = total > 0 ? (recovered.length / total) * 100 : 0;
@@ -206,7 +265,25 @@ function RecoveryPage() {
       recoveredValue,
       rate,
     };
-  }, [items]);
+  }, [periodItems]);
+
+  const handleReset = async () => {
+    setResetting(true);
+    try {
+      await resetHistory();
+      const now = new Date().toISOString();
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(RESET_STORAGE_KEY, now);
+      }
+      setResetAt(now);
+      await refetchAttempts();
+      toast.success("Histórico de recuperação resetado.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao resetar histórico.");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const buildWhatsAppLink = (item: RecoveryItem) => {
     const phone = normalizePhone(item.customerPhone);
@@ -228,11 +305,60 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
   };
 
+  const periodLabel =
+    period === "today" ? "Hoje" :
+    period === "7d" ? "Últimos 7 dias" :
+    period === "30d" ? "Últimos 30 dias" :
+    customFrom && customTo ? `${customFrom} → ${customTo}` : "Personalizado";
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Recuperação de Vendas</h1>
-        <p className="text-muted-foreground">Recupere vendas perdidas enviando o link do checkout direto pelo WhatsApp.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Recuperação de Vendas</h1>
+          <p className="text-muted-foreground">Recupere vendas perdidas enviando o link do checkout direto pelo WhatsApp.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Hoje</SelectItem>
+              <SelectItem value="7d">Últimos 7 dias</SelectItem>
+              <SelectItem value="30d">Últimos 30 dias</SelectItem>
+              <SelectItem value="custom">Personalizado</SelectItem>
+            </SelectContent>
+          </Select>
+          {period === "custom" && (
+            <>
+              <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="w-[150px]" />
+              <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="w-[150px]" />
+            </>
+          )}
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={resetting}>
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                Resetar Dados
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Resetar histórico de recuperação?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Isso apaga todas as tentativas de recuperação registradas e oculta os checkouts abandonados anteriores desta aba. As vendas e transações reais permanecem intactas. Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleReset} disabled={resetting}>
+                  {resetting ? "Resetando..." : "Sim, resetar"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -247,7 +373,7 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Checkouts Abandonados & Recuperados</CardTitle>
-              <CardDescription>Últimos {ABANDONED_WINDOW_DAYS} dias.</CardDescription>
+              <CardDescription>Período: {periodLabel}.</CardDescription>
             </div>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
