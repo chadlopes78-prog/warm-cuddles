@@ -206,12 +206,45 @@ async function reconcileCheckoutSaleWithGateway(sale: CheckoutSaleRow) {
 
   const localRef = sale.payment_reference ? String(sale.payment_reference) : "";
   const localTx = sale.transaction_id ? String(sale.transaction_id) : "";
+  const saleAmount = Number(sale.amount ?? 0);
+  const salePhoneDigits = String(sale.customer_phone ?? "").replace(/\D/g, "");
+  const saleLocalPhone = salePhoneDigits.startsWith("258") ? salePhoneDigits.slice(3) : salePhoneDigits;
+  const saleMethod = String(sale.payment_method ?? "").toLowerCase();
+  const saleCreatedMs = sale.created_at ? new Date(sale.created_at).getTime() : 0;
   const matchesSale = (tx: GatewayRecord) => {
     const txRef = readGatewayReference(tx) ?? "";
     const txId = readGatewayTransactionId(tx) ?? "";
-    return Boolean(
+    if (
       (localRef && (txRef === localRef || txId === localRef)) ||
-        (localTx && (txRef === localTx || txId === localTx)),
+      (localTx && (txRef === localTx || txId === localTx))
+    ) {
+      return true;
+    }
+
+    // PayBlack/Payflax does not always store our submitted PMZ reference in
+    // /api/transactions; it can generate its own T.../REF... references. When
+    // that happens, match the still-pending checkout sale using immutable facts:
+    // same wallet method, exact amount, same phone, and created almost at the
+    // same time. This is what releases access instantly after e-Mola confirms
+    // even if the webhook missed or returned a gateway-only reference.
+    const txMethod = String(tx.method ?? tx.payment_method ?? "").toLowerCase();
+    const methodMatches =
+      (saleMethod.includes("emola") && txMethod.includes("emola")) ||
+      (saleMethod.includes("mpesa") && txMethod.includes("mpesa"));
+    const txAmount = Number(tx.amount ?? tx.value ?? tx.total ?? 0);
+    const txPhoneDigits = String(tx.phone ?? tx.msisdn ?? tx.customer_phone ?? "").replace(/\D/g, "");
+    const txLocalPhone = txPhoneDigits.startsWith("258") ? txPhoneDigits.slice(3) : txPhoneDigits;
+    const txCreatedMs = tx.created_at ? new Date(String(tx.created_at)).getTime() : 0;
+    const createdClose =
+      saleCreatedMs > 0 && txCreatedMs > 0 && Math.abs(txCreatedMs - saleCreatedMs) <= 120_000;
+    return Boolean(
+      methodMatches &&
+        Number.isFinite(txAmount) &&
+        Number.isFinite(saleAmount) &&
+        txAmount === saleAmount &&
+        saleLocalPhone &&
+        txLocalPhone.endsWith(saleLocalPhone) &&
+        createdClose,
     );
   };
 
@@ -226,7 +259,7 @@ async function reconcileCheckoutSaleWithGateway(sale: CheckoutSaleRow) {
     gatewayTx = gatewayRecordsFromPayload(detail).find(matchesSale) ?? null;
   }
 
-  if (!gatewayTx && localRef) {
+  if (!gatewayTx) {
     const list = await fetchGatewayJson(joinUrl(baseUrl, "/api/transactions"), headers, 2_500);
     gatewayTx = gatewayRecordsFromPayload(list).find(matchesSale) ?? null;
   }
