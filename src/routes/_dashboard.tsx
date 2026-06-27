@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard,
   Package,
-  Users,
+  
   Settings,
   LogOut,
   ChevronLeft,
