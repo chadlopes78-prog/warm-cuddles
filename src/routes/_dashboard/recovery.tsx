@@ -475,7 +475,7 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{timeAgo(item.lastAttemptAt)}</TableCell>
                       <TableCell>
-                        <StatusBadge status={item.status} />
+                        <StatusBadge status={item.status} contactSent={item.contactSent} />
                       </TableCell>
                       <TableCell className="text-right">
                         {item.status === "recovered" ? (
