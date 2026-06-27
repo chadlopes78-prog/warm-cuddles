@@ -12,12 +12,19 @@ export const Route = createFileRoute("/api/public/payment-webhook")({
           return new Response("Invalid JSON", { status: 400 });
         }
 
-        // Optional shared-secret verification (header sent by e2payment)
+        // Optional shared-secret verification. Some gateways support headers,
+        // others only echo the callback URL query string; accept both without
+        // making the public webhook unusable when a secret is configured.
         const expectedSecret = process.env.PAYMENT_WEBHOOK_SECRET;
         if (expectedSecret) {
+          const url = new URL(request.url);
           const sent =
             request.headers.get("x-webhook-secret") ||
             request.headers.get("x-payment-secret") ||
+            request.headers.get("x-webhook-token") ||
+            request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
+            url.searchParams.get("token") ||
+            url.searchParams.get("secret") ||
             "";
           if (sent !== expectedSecret) {
             return new Response("Unauthorized", { status: 401 });
