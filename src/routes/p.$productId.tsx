@@ -259,8 +259,10 @@ function CheckoutPage() {
       }
 
       trackEvent("Purchase");
-      setPaymentStatusMessage("Pagamento enviado. A redirecionar...");
-      window.location.href = `/payment-success?productId=${productId}&saleId=${result.saleId}`;
+      setPaymentStatusMessage(
+        `Pedido enviado para ${paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola"}. Digite o PIN no seu telefone para concluir o pagamento.`,
+      );
+      setPendingSaleId(result.saleId);
     } catch (error: any) {
       setPaymentErrorMessage(error?.message || "Erro inesperado ao processar pagamento.");
       setPaymentErrorCode("internal");
