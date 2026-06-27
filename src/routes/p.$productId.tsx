@@ -152,7 +152,7 @@ function CheckoutPage() {
             setPaymentStatusMessage("Pagamento aprovado! Obrigado.");
             const url = r?.product?.thank_you_url?.trim();
             if (url) {
-              setTimeout(() => window.location.replace(url), 800);
+              window.location.replace(url);
             }
             return;
           }
