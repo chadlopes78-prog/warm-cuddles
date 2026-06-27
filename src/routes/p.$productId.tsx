@@ -190,27 +190,56 @@ function CheckoutPage() {
     } catch (e) { console.error(e); }
   };
 
-  const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Normalize phone input: strip non-digits, drop leading "258" or "0" so the
+  // server-side regex (^258\d{9}$) and prefix checks pass without surprises.
+  const sanitizePhone = (v: string) => {
+    let d = v.replace(/\D/g, "");
+    if (d.startsWith("258")) d = d.slice(3);
+    if (d.startsWith("0")) d = d.slice(1);
+    return d.slice(0, 9);
+  };
 
-    if (!phone || phone.replace(/\D/g, "").length < 9) {
-      toast.error("Por favor, insira um número de telefone válido.");
+  const validatePhoneClient = (raw: string): string | null => {
+    const d = sanitizePhone(raw);
+    if (d.length !== 9) return "Número deve ter 9 dígitos (ex: 84xxxxxxx).";
+    const prefix = d.slice(0, 2);
+    if (paymentMethod === "mpesa" && !["84", "85"].includes(prefix)) {
+      return "Para M-Pesa use um número que comece com 84 ou 85.";
+    }
+    if (paymentMethod === "emola" && !["86", "87"].includes(prefix)) {
+      return "Para e-Mola use um número que comece com 86 ou 87.";
+    }
+    return null;
+  };
+
+  const submitPayment = async () => {
+    const phoneError = validatePhoneClient(phone);
+    if (phoneError) {
+      setPaymentErrorMessage(phoneError);
+      setPaymentErrorCode("invalid_phone");
+      setPaymentRetryable(true);
+      setPaymentStatusMessage(null);
+      toast.error(phoneError);
       return;
     }
 
     setProcessingPayment(true);
     setPaymentErrorMessage(null);
-    setPaymentStatusMessage(`Pedido enviado para ${paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola"}. Confirme no seu telefone.`);
-    trackEvent('InitiateCheckout');
+    setPaymentErrorCode(null);
+    setPaymentRetryable(false);
+    setPaymentStatusMessage(
+      `Pedido enviado para ${paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola"}. Confirme no seu telefone digitando o PIN.`,
+    );
+    trackEvent("InitiateCheckout");
 
     try {
       const result = (await payFn({
         data: {
           productId,
           method: paymentMethod,
-          msisdn: phone,
+          msisdn: sanitizePhone(phone),
           customerName: name,
-          contactPhone: contactPhone || undefined,
+          contactPhone: contactPhone ? sanitizePhone(contactPhone) : undefined,
           trafficPageTrackingId: trafficPageId,
           bumpAccepted: bumpAccepted && !!product?.bump_enabled,
         },
@@ -218,22 +247,32 @@ function CheckoutPage() {
 
       if (!result.success) {
         setPaymentErrorMessage(result.error || "Pagamento recusado.");
+        setPaymentErrorCode(result.code || "gateway");
+        setPaymentRetryable(result.retryable !== false);
         setPaymentStatusMessage(null);
         toast.error(result.error || "Pagamento recusado.");
         setProcessingPayment(false);
         return;
       }
 
-      trackEvent('Purchase');
+      trackEvent("Purchase");
       setPaymentStatusMessage("Pagamento enviado. A redirecionar...");
       window.location.href = `/payment-success?productId=${productId}&saleId=${result.saleId}`;
     } catch (error: any) {
       setPaymentErrorMessage(error?.message || "Erro inesperado ao processar pagamento.");
+      setPaymentErrorCode("internal");
+      setPaymentRetryable(true);
       setPaymentStatusMessage(null);
       toast.error("Erro ao processar pagamento: " + error.message);
       setProcessingPayment(false);
     }
   };
+
+  const handlePayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submitPayment();
+  };
+
 
   if (!product) {
     return (
