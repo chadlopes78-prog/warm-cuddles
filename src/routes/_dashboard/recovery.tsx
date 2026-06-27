@@ -66,6 +66,7 @@ type RecoveryItem = {
   lastAttemptAt: string;
   status: "pending" | "expired" | "recovered";
   recoveredAt: string | null;
+  contactSent: boolean;
 };
 
 function normalizePhone(raw: string): string {
