@@ -8,31 +8,19 @@ import {
   ShoppingCart,
   AlertCircle,
   BarChart3,
-  Trash2,
   AlertTriangle,
   RefreshCcw
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DateRangePicker, DateRangePreset } from "@/components/dashboard/DateRangePicker";
 import { format, subDays, differenceInDays, startOfDay, endOfDay, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 // Lazy load chart (Recharts ~220KB)
 const PerformanceChart = lazy(() => import("@/components/dashboard/PerformanceChart"));
@@ -67,8 +55,6 @@ function DashboardPage() {
     return (sessionStorage.getItem("dashboard-preset") as DateRangePreset) || "last7days";
   });
 
-  const [resetConfirmText, setResetConfirmText] = useState("");
-  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -181,48 +167,6 @@ function DashboardPage() {
     retry: 1,
   });
 
-  const resetData = useMutation({
-    mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Não autenticado");
-
-      // We use the same logic as in settings but centralized here if needed
-      // Reset all user data safely
-      await supabase.from("sales").delete().eq("user_id", user.id);
-      
-      const { data: userProducts } = await supabase
-        .from("products")
-        .select("id")
-        .eq("user_id", user.id);
-      
-      const productIds = userProducts?.map(p => p.id) || [];
-
-      if (productIds.length > 0) {
-        const { data: userPages } = await supabase
-          .from("traffic_pages")
-          .select("id")
-          .in("product_id", productIds);
-        
-        const pageIds = userPages?.map(p => p.id) || [];
-        if (pageIds.length > 0) {
-          await supabase.from("traffic_events").delete().in("page_id", pageIds);
-        }
-      }
-
-      await supabase.from("notifications_log").delete().eq("user_id", user.id);
-      await supabase.from("marketing_alerts").delete().eq("user_id", user.id);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries();
-      toast.success("Dados resetados com sucesso!");
-      setIsResetDialogOpen(false);
-      setResetConfirmText("");
-      refetch();
-    },
-    onError: (error: any) => {
-      toast.error("Erro ao resetar: " + error.message);
-    }
-  });
 
   const handleRangeChange = (range: { from: Date; to: Date }, newPreset: DateRangePreset) => {
     setDateRange(range);
@@ -393,49 +337,6 @@ function DashboardPage() {
         <div className="flex flex-wrap items-center gap-2">
           <DateRangePicker onRangeChange={handleRangeChange} initialPreset={preset} initialRange={dateRange} />
           
-          <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="h-10 rounded-xl border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 gap-2 font-black uppercase tracking-tighter text-[10px]">
-                <Trash2 className="h-3.5 w-3.5" />
-                Resetar Dados
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="max-w-md rounded-3xl border-none shadow-2xl">
-              <AlertDialogHeader>
-                <div className="flex items-center gap-3 text-red-600 mb-2">
-                  <div className="p-3 bg-red-100 rounded-2xl">
-                    <AlertTriangle className="h-6 w-6" />
-                  </div>
-                  <AlertDialogTitle className="text-2xl font-black uppercase tracking-tighter">Limpeza de Dados</AlertDialogTitle>
-                </div>
-                <AlertDialogDescription className="text-slate-600 font-bold">
-                  Esta ação irá apagar todas as vendas e métricas do período selecionado. <span className="text-red-600">Irreversível.</span>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              
-              <div className="py-4 space-y-3">
-                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Digite CONFIRMAR RESET para prosseguir:</p>
-                <Input 
-                  value={resetConfirmText}
-                  onChange={(e) => setResetConfirmText(e.target.value)}
-                  placeholder="CONFIRMAR RESET"
-                  className="h-12 border-2 text-center font-black uppercase tracking-widest focus-visible:ring-red-500 rounded-2xl"
-                />
-              </div>
-
-              <AlertDialogFooter className="gap-2 sm:gap-0">
-                <AlertDialogCancel className="h-12 rounded-2xl font-black uppercase tracking-tighter border-2">Sair</AlertDialogCancel>
-                <Button
-                  variant="destructive"
-                  disabled={resetConfirmText !== "CONFIRMAR RESET" || resetData.isPending}
-                  onClick={() => resetData.mutate()}
-                  className="h-12 rounded-2xl font-black uppercase tracking-tighter px-6"
-                >
-                  {resetData.isPending ? "Limpando..." : "Confirmar Reset"}
-                </Button>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
         </div>
       </div>
 
