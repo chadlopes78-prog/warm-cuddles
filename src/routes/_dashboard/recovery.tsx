@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { MessageSquare, MessageCircle, CheckCircle2, Clock, TrendingUp, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import {
@@ -15,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { logRecoveryAttempt } from "@/lib/api/recovery.functions";
 
 export const Route = createFileRoute("/_dashboard/recovery")({
   component: RecoveryPage,
