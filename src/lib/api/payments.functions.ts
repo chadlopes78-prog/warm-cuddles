@@ -63,38 +63,39 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
       throw new Error("Não foi possível consultar o estado do pagamento.");
     }
     if (!sale) return { sale: null, product: null };
+    let saleRow = sale as CheckoutSaleRow & { products?: unknown };
 
-    const currentStatus = String(sale.status ?? "").toLowerCase();
+    const currentStatus = String(saleRow.status ?? "").toLowerCase();
     if (currentStatus === "pending") {
-      const reconciled = await reconcileCheckoutSaleWithGateway(sale).catch((e) => {
+      const reconciled = await reconcileCheckoutSaleWithGateway(saleRow).catch((e: unknown) => {
         console.error("[checkout] gateway reconciliation failed", e);
         return null;
       });
-      if (reconciled) sale = reconciled;
+      if (reconciled) saleRow = reconciled as CheckoutSaleRow & { products?: unknown };
     }
 
-    const statusAfterReconcile = String(sale.status ?? "").toLowerCase();
-    const pendingAgeMs = sale.created_at ? Date.now() - new Date(sale.created_at).getTime() : 0;
+    const statusAfterReconcile = String(saleRow.status ?? "").toLowerCase();
+    const pendingAgeMs = saleRow.created_at ? Date.now() - new Date(saleRow.created_at).getTime() : 0;
     if (statusAfterReconcile === "pending" && pendingAgeMs > 6 * 60_000) {
       const { markSaleTerminalFailure } = await import("@/lib/payments/confirmation.server");
       await markSaleTerminalFailure({
-        saleId: sale.id,
+        saleId: saleRow.id,
         status: "expired",
         reason: "Pagamento não confirmado dentro do tempo limite. Tente novamente ou escolha outro método.",
-        method: sale.payment_method ?? null,
-      }).catch((e) => console.error("[checkout] auto-expire pending sale failed", e));
+        method: saleRow.payment_method ?? null,
+      }).catch((e: unknown) => console.error("[checkout] auto-expire pending sale failed", e));
 
       const refreshed = await supabaseAdmin
         .from("sales")
         .select(PAYMENT_SUCCESS_SELECT)
         .eq("id", data.saleId)
         .maybeSingle();
-      if (!refreshed.error && refreshed.data) sale = refreshed.data;
+      if (!refreshed.error && refreshed.data) saleRow = refreshed.data as CheckoutSaleRow & { products?: unknown };
     }
 
-    const status = String(sale.status ?? "").toLowerCase();
+    const status = String(saleRow.status ?? "").toLowerCase();
     const isPaid = ["paid", "approved", "success", "completed"].includes(status);
-    const product = sale.products as {
+    const product = saleRow.products as {
       access_link?: string | null;
       delivery_link?: string | null;
       support_phone?: string | null;
@@ -104,7 +105,7 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
     } | null;
 
     return {
-      sale: { status: sale.status, status_reason: sale.status_reason },
+      sale: { status: saleRow.status, status_reason: saleRow.status_reason },
       product: product
         ? {
             access_link: isPaid ? product.access_link : null,
