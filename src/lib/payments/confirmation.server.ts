@@ -587,6 +587,26 @@ async function dispatchApprovedSideEffects(
   // por `webhook_deliveries.dedupe_key = approved:${saleId}:${endpointId}`
   // mais o lock por `pushcut_logs.order_id` em `sendPushcutOnce`.
 
+  // Meta Conversions API (CAPI) — single Purchase per confirmed sale.
+  // This runs exactly once because `confirmSalePayment` guards the update
+  // with `.neq("status","paid")`, so the transition pending→paid fires
+  // this side-effect block exactly once. `event_id = sale.id` dedupes
+  // against the browser Pixel `fbq('track','Purchase', {}, {eventID})`.
+  try {
+    const { sendMetaPurchaseCapi } = await import("@/lib/meta/capi.server");
+    void sendMetaPurchaseCapi({
+      saleId: sale.id,
+      userId,
+      productId: sale.product_id ?? null,
+      amount: sale.amount as number | string | null,
+      customerPhone: sale.customer_phone ?? null,
+      customerName: sale.customer_name ?? null,
+    });
+  } catch (e) {
+    console.error("[meta-capi] dispatch error (suppressed)", e);
+  }
+
+
 
   const { enqueueWebhookEvent, processPendingForUser } =
     await import("@/lib/webhooks/dispatcher.server");

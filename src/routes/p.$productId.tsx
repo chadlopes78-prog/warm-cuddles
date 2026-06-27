@@ -154,8 +154,17 @@ function CheckoutPage() {
           if (cancelled) return;
           const status = String(r?.sale?.status ?? "").toLowerCase();
           if (TERMINAL_OK.includes(status)) {
+            // Fire the REAL Purchase event exactly once, deduped with the
+            // server-side CAPI call via `eventID = pendingSaleId`. Meta
+            // matches event_id within 48h and counts as a single Purchase.
+            trackEvent(
+              "Purchase",
+              { content_ids: [product.id], content_type: "product" },
+              pendingSaleId ?? undefined,
+            );
             setPaymentConfirmed(true);
             setProcessingPayment(false);
+
             const rawUrl =
               r?.product?.thank_you_url?.trim() ||
               r?.product?.access_link?.trim() ||
@@ -269,15 +278,17 @@ function CheckoutPage() {
     }
   }, [pixelId, product?.id]);
 
-  const trackEvent = (event: string) => {
+  const trackEvent = (event: string, extra?: Record<string, unknown>, eventID?: string) => {
     try {
       if (pixelId && window.fbq) {
+        const opts = eventID ? { eventID } : undefined;
         window.fbq('track', event, {
-          content_name: product.name, value: product.price, currency: 'MZN',
-        });
+          content_name: product.name, value: product.price, currency: 'MZN', ...extra,
+        }, opts);
       }
     } catch (e) { console.error(e); }
   };
+
 
   // Normalize phone input: strip non-digits, drop leading "258" or "0" so the
   // server-side regex (^258\d{9}$) and prefix checks pass without surprises.
@@ -344,10 +355,14 @@ function CheckoutPage() {
         return;
       }
 
-      trackEvent("Purchase");
+      // NOTE: do NOT fire 'Purchase' here — the gateway has only accepted
+      // the request, not confirmed payment. The real Purchase event is
+      // fired below, in the polling effect, when the sale reaches a
+      // TERMINAL_OK status. Dedup with CAPI uses `eventID = saleId`.
       setPaymentStatusMessage(
         `Pedido enviado para ${paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola"}. Digite o PIN no seu telefone para concluir o pagamento.`,
       );
+
       setPendingSaleId(result.saleId);
     } catch (error: any) {
       setPaymentErrorMessage(error?.message || "Erro inesperado ao processar pagamento.");
