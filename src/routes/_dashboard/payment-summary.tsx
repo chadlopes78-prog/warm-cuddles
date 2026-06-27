@@ -82,7 +82,7 @@ function PaymentSummaryPage() {
       if (!SUCCESS.has((s.status || "").toLowerCase())) continue;
       const m = methodOf(s.payment_method);
       if (m === "other") continue;
-      const amt = Number(s.amount || 0) + Number(s.bump_amount || 0);
+      const amt = Number(s.amount || 0);
       const net = Math.max(0, amt - amt * 0.15 - 15);
       acc[m].gross += amt;
       acc[m].net += net;
