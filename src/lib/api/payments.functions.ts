@@ -133,6 +133,37 @@ function configuredPublicUrl() {
   return raw ? raw.replace(/\/+$/, "") : "";
 }
 
+function configuredWebhookUrl() {
+  const explicit = process.env.PAYMENT_WEBHOOK_URL || process.env.PAYMENT_CALLBACK_URL || "";
+  const secret = process.env.PAYMENT_WEBHOOK_SECRET || "";
+  const appendSecret = (url: string) => {
+    if (!secret) return url;
+    try {
+      const u = new URL(url);
+      if (!u.searchParams.has("token") && !u.searchParams.has("secret")) {
+        u.searchParams.set("token", secret);
+      }
+      return u.toString();
+    } catch {
+      return url;
+    }
+  };
+
+  if (explicit && /^https?:\/\//i.test(explicit)) {
+    const clean = explicit.replace(/\/+$/, "");
+    try {
+      const u = new URL(clean);
+      if (/\/api\/public\/payment-webhook$/i.test(u.pathname)) return appendSecret(clean);
+    } catch {
+      // Fall back to appending the webhook path below.
+    }
+    return appendSecret(`${clean}/api/public/payment-webhook`);
+  }
+
+  const publicUrl = configuredPublicUrl();
+  return publicUrl ? appendSecret(`${publicUrl}/api/public/payment-webhook`) : "";
+}
+
 export const processPayment = createServerFn({ method: "POST" })
   .inputValidator(PaymentInput)
   .handler(async ({ data }): Promise<PaymentResult> => {
