@@ -3,14 +3,20 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateRangePicker } from "@/components/dashboard/DateRangePicker";
-import { Loader2, Smartphone, Wallet, TrendingUp, Percent } from "lucide-react";
+import { Loader2, Smartphone, Wallet, TrendingUp, Percent, CheckCircle2 } from "lucide-react";
 import { startOfDay, endOfDay, subDays } from "date-fns";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 
 export const Route = createFileRoute("/_dashboard/payment-summary")({
   component: PaymentSummaryPage,
 });
 
-type Sale = { amount: number; bump_amount: number | null; payment_method: string | null; status: string | null };
+type Sale = {
+  amount: number;
+  bump_amount: number | null;
+  payment_method: string | null;
+  status: string | null;
+};
 
 const SUCCESS = new Set(["approved", "paid", "success"]);
 
@@ -22,7 +28,13 @@ function methodOf(m: string | null | undefined): "mpesa" | "emola" | "other" {
 }
 
 const fmt = (n: number) =>
-  new Intl.NumberFormat("pt-PT", { style: "currency", currency: "MZN", maximumFractionDigits: 2 }).format(n);
+  new Intl.NumberFormat("pt-PT", {
+    style: "currency",
+    currency: "MZN",
+    maximumFractionDigits: 2,
+  }).format(n);
+
+const COLORS = { mpesa: "#dc2626", emola: "#f59e0b" };
 
 function PaymentSummaryPage() {
   const now = new Date();
@@ -37,12 +49,18 @@ function PaymentSummaryPage() {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setLoading(false); return; }
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        setLoading(false);
+        return;
+      }
       const { data } = await supabase
         .from("sales")
         .select("amount,bump_amount,payment_method,status")
         .eq("user_id", session.user.id)
+        .in("status", ["approved", "paid", "success"])
         .gte("created_at", range.from.toISOString())
         .lte("created_at", range.to.toISOString());
       if (!cancelled) {
@@ -50,7 +68,9 @@ function PaymentSummaryPage() {
         setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [range.from, range.to]);
 
   const summary = useMemo(() => {
@@ -82,18 +102,28 @@ function PaymentSummaryPage() {
     };
   }, [sales]);
 
+  const pieData = useMemo(
+    () =>
+      [
+        { name: "M-Pesa", value: summary.mpesa.total, key: "mpesa" as const },
+        { name: "e-Mola", value: summary.emola.total, key: "emola" as const },
+      ].filter((d) => d.value > 0),
+    [summary],
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Resumo por Método de Pagamento</h1>
-          <p className="text-sm text-slate-500 mt-1">Comparativo entre M-Pesa e e-Mola no período selecionado.</p>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900">
+            Resumo por Método de Pagamento
+          </h1>
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+            Apenas vendas confirmadas no período selecionado.
+          </p>
         </div>
-        <DateRangePicker
-          initialPreset="last7days"
-          initialRange={range}
-          onRangeChange={(r) => setRange(r)}
-        />
+        <DateRangePicker initialPreset="last7days" initialRange={range} onRangeChange={(r) => setRange(r)} />
       </div>
 
       {loading ? (
@@ -117,25 +147,119 @@ function PaymentSummaryPage() {
             />
           </div>
 
-          <Card className="rounded-2xl border-slate-100 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-base font-bold">Faturamento Total no Período</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-black tracking-tight text-slate-900">{fmt(summary.grand)}</p>
-              <p className="mt-1 text-sm text-slate-500">
-                {summary.mpesa.count + summary.emola.count} transações concluídas
-              </p>
-            </CardContent>
-          </Card>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="rounded-2xl border-slate-100 shadow-sm md:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-base font-bold">Distribuição por Método</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {pieData.length === 0 ? (
+                  <div className="flex h-[280px] items-center justify-center">
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-300">
+                      Sem vendas confirmadas
+                    </p>
+                  </div>
+                ) : (
+                  <div className="h-[280px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <defs>
+                          <linearGradient id="g-mpesa" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="#ef4444" />
+                            <stop offset="100%" stopColor="#b91c1c" />
+                          </linearGradient>
+                          <linearGradient id="g-emola" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="#fbbf24" />
+                            <stop offset="100%" stopColor="#d97706" />
+                          </linearGradient>
+                        </defs>
+                        <Pie
+                          data={pieData}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={70}
+                          outerRadius={110}
+                          paddingAngle={3}
+                          stroke="#fff"
+                          strokeWidth={3}
+                          isAnimationActive={false}
+                        >
+                          {pieData.map((d) => (
+                            <Cell key={d.key} fill={`url(#g-${d.key})`} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(v: number) => fmt(Number(v))}
+                          contentStyle={{
+                            borderRadius: 14,
+                            border: "1px solid #e2e8f0",
+                            boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.08)",
+                            fontSize: 12,
+                            fontWeight: 700,
+                          }}
+                        />
+                        <Legend
+                          verticalAlign="bottom"
+                          iconType="circle"
+                          iconSize={8}
+                          wrapperStyle={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            textTransform: "uppercase",
+                            color: "#475569",
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl border-slate-100 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base font-bold">Faturamento Total</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-3xl font-black tracking-tight text-slate-900">{fmt(summary.grand)}</p>
+                  <p className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-400">
+                    {summary.mpesa.count + summary.emola.count} transações confirmadas
+                  </p>
+                </div>
+                <div className="space-y-2 border-t border-slate-100 pt-3">
+                  <Row color={COLORS.mpesa} label="M-Pesa" value={fmt(summary.mpesa.total)} pct={summary.mpesa.pct} />
+                  <Row color={COLORS.emola} label="e-Mola" value={fmt(summary.emola.total)} pct={summary.emola.pct} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </>
       )}
     </div>
   );
 }
 
+function Row({ color, label, value, pct }: { color: string; label: string; value: string; pct: number }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-600">{label}</span>
+      </div>
+      <div className="text-right">
+        <p className="text-sm font-bold text-slate-900">{value}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{pct.toFixed(1)}%</p>
+      </div>
+    </div>
+  );
+}
+
 function MethodCard({
-  label, icon, accent, data,
+  label,
+  icon,
+  accent,
+  data,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -150,21 +274,13 @@ function MethodCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Total recebido</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Total confirmado</p>
           <p className="text-2xl font-black tracking-tight text-slate-900">{fmt(data.total)}</p>
         </div>
-        <div className="grid grid-cols-3 gap-3 pt-2 border-t border-slate-100">
+        <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-2">
           <Stat label="Transações" value={String(data.count)} />
-          <Stat
-            label="Ticket médio"
-            value={fmt(data.avg)}
-            icon={<TrendingUp className="h-3 w-3" />}
-          />
-          <Stat
-            label="% do total"
-            value={`${data.pct.toFixed(1)}%`}
-            icon={<Percent className="h-3 w-3" />}
-          />
+          <Stat label="Ticket médio" value={fmt(data.avg)} icon={<TrendingUp className="h-3 w-3" />} />
+          <Stat label="% do total" value={`${data.pct.toFixed(1)}%`} icon={<Percent className="h-3 w-3" />} />
         </div>
       </CardContent>
     </Card>
@@ -175,9 +291,10 @@ function Stat({ label, value, icon }: { label: string; value: string; icon?: Rea
   return (
     <div>
       <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
-        {icon}{label}
+        {icon}
+        {label}
       </p>
-      <p className="mt-1 text-sm font-bold text-slate-900 truncate">{value}</p>
+      <p className="mt-1 truncate text-sm font-bold text-slate-900">{value}</p>
     </div>
   );
 }
