@@ -35,6 +35,11 @@ function SettingsPage() {
   const queryClient = useQueryClient();
   const [fullName, setFullName] = useState("");
   const [pushcutUrl, setPushcutUrl] = useState("");
+  const [pushcutEnabled, setPushcutEnabled] = useState(true);
+  const [pushcutTemplate, setPushcutTemplate] = useState<"simple" | "marketing">("simple");
+  const [testingPushcut, setTestingPushcut] = useState(false);
+  const testPushcutFn = useServerFn(testPushcut);
+
   const [mpesaNumber, setMpesaNumber] = useState("");
   const [emolaNumber, setEmolaNumber] = useState("");
   const [editingMpesa, setEditingMpesa] = useState(false);
