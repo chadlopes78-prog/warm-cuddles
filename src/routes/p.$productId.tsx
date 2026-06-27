@@ -35,7 +35,14 @@ export const Route = createFileRoute("/p/$productId")({
   },
   head: ({ loaderData }) => {
     const product = loaderData?.product;
-    if (!product) return {};
+    const baseLinks = [
+      // Warm TCP+TLS to the payment gateway BEFORE the user clicks "Pagar".
+      // Removes ~150–400 ms of handshake from the critical path on first click.
+      { rel: "preconnect", href: "https://payflax.site", crossOrigin: "anonymous" as const },
+      { rel: "dns-prefetch", href: "https://payflax.site" },
+    ];
+
+    if (!product) return { links: baseLinks };
     const image = product.image_url || "";
     return {
       meta: [
@@ -45,10 +52,11 @@ export const Route = createFileRoute("/p/$productId")({
         { property: "og:image", content: image },
       ],
       links: image
-        ? [{ rel: "preload", as: "image", href: image, fetchpriority: "high" }]
-        : [],
+        ? [...baseLinks, { rel: "preload", as: "image", href: image, fetchpriority: "high" }]
+        : baseLinks,
     };
   },
+
   pendingComponent: CheckoutSkeleton,
   component: CheckoutPage,
 });
@@ -99,12 +107,16 @@ function CheckoutPage() {
   const [processingPayment, setProcessingPayment] = useState(false);
   const [paymentStatusMessage, setPaymentStatusMessage] = useState<string | null>(null);
   const [paymentErrorMessage, setPaymentErrorMessage] = useState<string | null>(null);
+  const [paymentErrorCode, setPaymentErrorCode] = useState<string | null>(null);
+  const [paymentRetryable, setPaymentRetryable] = useState(false);
+
 
   const [name, setName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [phone, setPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "emola">("mpesa");
   const [bumpAccepted, setBumpAccepted] = useState(false);
+
   const [timeLeft, setTimeLeft] = useState(360);
 
   useEffect(() => {
@@ -178,27 +190,56 @@ function CheckoutPage() {
     } catch (e) { console.error(e); }
   };
 
-  const handlePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Normalize phone input: strip non-digits, drop leading "258" or "0" so the
+  // server-side regex (^258\d{9}$) and prefix checks pass without surprises.
+  const sanitizePhone = (v: string) => {
+    let d = v.replace(/\D/g, "");
+    if (d.startsWith("258")) d = d.slice(3);
+    if (d.startsWith("0")) d = d.slice(1);
+    return d.slice(0, 9);
+  };
 
-    if (!phone || phone.replace(/\D/g, "").length < 9) {
-      toast.error("Por favor, insira um número de telefone válido.");
+  const validatePhoneClient = (raw: string): string | null => {
+    const d = sanitizePhone(raw);
+    if (d.length !== 9) return "Número deve ter 9 dígitos (ex: 84xxxxxxx).";
+    const prefix = d.slice(0, 2);
+    if (paymentMethod === "mpesa" && !["84", "85"].includes(prefix)) {
+      return "Para M-Pesa use um número que comece com 84 ou 85.";
+    }
+    if (paymentMethod === "emola" && !["86", "87"].includes(prefix)) {
+      return "Para e-Mola use um número que comece com 86 ou 87.";
+    }
+    return null;
+  };
+
+  const submitPayment = async () => {
+    const phoneError = validatePhoneClient(phone);
+    if (phoneError) {
+      setPaymentErrorMessage(phoneError);
+      setPaymentErrorCode("invalid_phone");
+      setPaymentRetryable(true);
+      setPaymentStatusMessage(null);
+      toast.error(phoneError);
       return;
     }
 
     setProcessingPayment(true);
     setPaymentErrorMessage(null);
-    setPaymentStatusMessage(`Pedido enviado para ${paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola"}. Confirme no seu telefone.`);
-    trackEvent('InitiateCheckout');
+    setPaymentErrorCode(null);
+    setPaymentRetryable(false);
+    setPaymentStatusMessage(
+      `Pedido enviado para ${paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola"}. Confirme no seu telefone digitando o PIN.`,
+    );
+    trackEvent("InitiateCheckout");
 
     try {
       const result = (await payFn({
         data: {
           productId,
           method: paymentMethod,
-          msisdn: phone,
+          msisdn: sanitizePhone(phone),
           customerName: name,
-          contactPhone: contactPhone || undefined,
+          contactPhone: contactPhone ? sanitizePhone(contactPhone) : undefined,
           trafficPageTrackingId: trafficPageId,
           bumpAccepted: bumpAccepted && !!product?.bump_enabled,
         },
@@ -206,22 +247,32 @@ function CheckoutPage() {
 
       if (!result.success) {
         setPaymentErrorMessage(result.error || "Pagamento recusado.");
+        setPaymentErrorCode(result.code || "gateway");
+        setPaymentRetryable(result.retryable !== false);
         setPaymentStatusMessage(null);
         toast.error(result.error || "Pagamento recusado.");
         setProcessingPayment(false);
         return;
       }
 
-      trackEvent('Purchase');
+      trackEvent("Purchase");
       setPaymentStatusMessage("Pagamento enviado. A redirecionar...");
       window.location.href = `/payment-success?productId=${productId}&saleId=${result.saleId}`;
     } catch (error: any) {
       setPaymentErrorMessage(error?.message || "Erro inesperado ao processar pagamento.");
+      setPaymentErrorCode("internal");
+      setPaymentRetryable(true);
       setPaymentStatusMessage(null);
       toast.error("Erro ao processar pagamento: " + error.message);
       setProcessingPayment(false);
     }
   };
+
+  const handlePayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submitPayment();
+  };
+
 
   if (!product) {
     return (
@@ -315,7 +366,7 @@ function CheckoutPage() {
                   placeholder="WhatsApp (84xxxxxxx)"
                   inputMode="tel"
                   value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
+                  onChange={(e) => setContactPhone(sanitizePhone(e.target.value))}
                   className="h-12 pl-[72px] border-slate-200 rounded-xl bg-slate-50/50 text-sm font-medium placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:bg-white"
                 />
               </div>
@@ -372,25 +423,61 @@ function CheckoutPage() {
                 required
                 inputMode="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(sanitizePhone(e.target.value))}
+                maxLength={9}
+
                 className="h-12 pl-[72px] border-slate-200 rounded-xl bg-slate-50/50 text-sm font-medium placeholder:text-slate-400 focus-visible:ring-2 focus-visible:bg-white"
                 style={{ ['--tw-ring-color' as any]: accent }}
               />
             </div>
 
             {/* Status / error */}
-            {(paymentStatusMessage || paymentErrorMessage) && (
-              <div
-                className={cn(
-                  "rounded-xl border p-3 text-xs font-medium",
-                  paymentErrorMessage
-                    ? "border-red-200 bg-red-50 text-red-700"
-                    : "border-emerald-200 bg-emerald-50 text-emerald-700",
+            {paymentErrorMessage ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 space-y-2">
+                <div className="flex items-start gap-2">
+                  <ShieldAlert className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-red-800 leading-snug">
+                      {paymentErrorCode === "insufficient_balance"
+                        ? "Saldo insuficiente na carteira"
+                        : paymentErrorCode === "cancelled"
+                          ? "Pagamento cancelado"
+                          : paymentErrorCode === "timeout"
+                            ? "PIN não confirmado a tempo"
+                            : paymentErrorCode === "invalid_phone" ||
+                                paymentErrorCode === "method_mismatch"
+                              ? "Número inválido"
+                              : "Pagamento não concluído"}
+                    </p>
+                    <p className="text-[11px] font-medium text-red-700 leading-snug mt-0.5">
+                      {paymentErrorCode === "insufficient_balance"
+                        ? "Recarrega a tua carteira e clica em Tentar novamente."
+                        : paymentErrorCode === "cancelled"
+                          ? "Cancelaste a confirmação. Podes tentar de novo agora."
+                          : paymentErrorCode === "timeout"
+                            ? "Tenta novamente e digita o PIN assim que receberes a notificação."
+                            : paymentErrorMessage}
+                    </p>
+                  </div>
+                </div>
+                {paymentRetryable && (
+                  <button
+                    type="button"
+                    onClick={() => void submitPayment()}
+                    disabled={processingPayment}
+                    className="w-full h-10 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 disabled:opacity-60 transition"
+                  >
+                    {processingPayment ? "A enviar..." : "Tentar novamente"}
+                  </button>
                 )}
-              >
-                {paymentErrorMessage || paymentStatusMessage}
               </div>
-            )}
+            ) : paymentStatusMessage ? (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-700">
+                {paymentStatusMessage}
+              </div>
+            ) : null}
+
+
 
             {/* Order Bump */}
             {product.bump_enabled && product.bump_price && Number(product.bump_price) > 0 && (

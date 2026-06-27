@@ -19,9 +19,31 @@ const PaymentSuccessInput = z.object({
   saleId: z.string().uuid(),
 });
 
+export type PaymentErrorCode =
+  | "invalid_phone"
+  | "method_mismatch"
+  | "insufficient_balance"
+  | "cancelled"
+  | "timeout"
+  | "duplicate"
+  | "gateway"
+  | "config"
+  | "internal";
+
 export type PaymentResult =
   | { success: true; saleId: string; transactionId: string | null }
-  | { success: false; error: string; saleId?: string };
+  | { success: false; error: string; code?: PaymentErrorCode; retryable?: boolean; saleId?: string };
+
+function classifyError(msg: string): { code: PaymentErrorCode; retryable: boolean } {
+  const s = (msg || "").toLowerCase();
+  if (/saldo|insufficient|insuf/.test(s)) return { code: "insufficient_balance", retryable: true };
+  if (/cancel/.test(s)) return { code: "cancelled", retryable: true };
+  if (/pin|timeout|tempo limite|n[aã]o confirmad|expir/.test(s)) return { code: "timeout", retryable: true };
+  if (/duplicate|duplicad/.test(s)) return { code: "duplicate", retryable: false };
+  if (/initiator|authentication|isdn|other process/.test(s)) return { code: "gateway", retryable: true };
+  return { code: "gateway", retryable: true };
+}
+
 
 export const getPaymentSuccessData = createServerFn({ method: "GET" })
   .inputValidator((input) => PaymentSuccessInput.parse(input))
@@ -86,24 +108,27 @@ export const processPayment = createServerFn({ method: "POST" })
     if (!/^258\d{9}$/.test(msisdn)) {
       return {
         success: false,
+        code: "invalid_phone",
+        retryable: true,
         error: "Número de telefone inválido. Use o formato 84/85/86/87xxxxxxx.",
       };
     }
 
     const localPrefix = msisdn.slice(3, 5);
     if (data.method === "mpesa" && !["84", "85"].includes(localPrefix)) {
-      return { success: false, error: "Para M-Pesa use um número 84 ou 85." };
+      return { success: false, code: "method_mismatch", retryable: true, error: "Para M-Pesa use um número 84 ou 85." };
     }
     if (data.method === "emola" && !["86", "87"].includes(localPrefix)) {
-      return { success: false, error: "Para e-Mola use um número 86 ou 87." };
+      return { success: false, code: "method_mismatch", retryable: true, error: "Para e-Mola use um número 86 ou 87." };
     }
 
     const apiKey = process.env.PAYMENT_API_KEY || DEFAULT_API_KEY;
     const baseUrl = process.env.PAYMENT_API_BASE_URL || DEFAULT_BASE_URL;
 
     if (!apiKey) {
-      return { success: false, error: "Gateway de pagamento não configurado no servidor." };
+      return { success: false, code: "config", retryable: false, error: "Gateway de pagamento não configurado no servidor." };
     }
+
 
     const t0 = Date.now();
 
@@ -277,7 +302,7 @@ export const processPayment = createServerFn({ method: "POST" })
     const earlyController: AbortController = new AbortController();
     const earlyTimeoutId: ReturnType<typeof setTimeout> = setTimeout(
       () => earlyController.abort(),
-      120_000,
+      90_000,
     );
     const tGwSent = Date.now();
     console.info("[perf] gateway early-fire", {
@@ -388,7 +413,7 @@ export const processPayment = createServerFn({ method: "POST" })
         }
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120_000);
+        const timeoutId = setTimeout(() => controller.abort(), 90_000);
         const tRetry = Date.now();
         try {
           res = await fetch(endpoint, {
@@ -492,7 +517,9 @@ export const processPayment = createServerFn({ method: "POST" })
           reason: String(message),
           method: gatewayMethod,
         });
-        return { success: false, saleId: sale.id, error: String(message) };
+        const cls = classifyError(String(message));
+        return { success: false, saleId: sale.id, error: String(message), code: cls.code, retryable: cls.retryable };
+
       } else {
         await supabaseAdmin
           .from("sales")
