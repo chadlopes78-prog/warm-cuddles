@@ -139,21 +139,49 @@ function SettingsPage() {
   });
 
   const updatePushcut = useMutation({
-    mutationFn: async (url: string) => {
+    mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Não autenticado");
+      const url = pushcutUrl.trim();
+      if (url && !/^https?:\/\/.+/i.test(url)) {
+        throw new Error("URL inválida. Use uma URL https://...");
+      }
       const { error } = await supabase
         .from("profiles")
-        .update({ pushcut_url: url || null, updated_at: new Date().toISOString() })
+        .update({
+          pushcut_url: url || null,
+          pushcut_enabled: pushcutEnabled,
+          pushcut_template: pushcutTemplate,
+          updated_at: new Date().toISOString(),
+        } as never)
         .eq("id", user.id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
-      toast.success("Link Pushcut salvo!");
+      toast.success("Integração Pushcut salva!");
     },
     onError: (error: any) => toast.error("Erro ao salvar: " + error.message),
   });
+
+  const handleTestPushcut = async () => {
+    const url = pushcutUrl.trim();
+    if (!url) {
+      toast.error("Informe a URL da Pushcut antes de testar.");
+      return;
+    }
+    setTestingPushcut(true);
+    try {
+      const res = await testPushcutFn({ data: { url } });
+      if (res.ok) toast.success("Pushcut conectado com sucesso!");
+      else toast.error(`Falha no teste: ${res.message ?? `HTTP ${res.status}`}`);
+    } catch (e) {
+      toast.error("Erro ao testar: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setTestingPushcut(false);
+    }
+  };
+
 
   const updateProfile = useMutation({
     mutationFn: async (name: string) => {
