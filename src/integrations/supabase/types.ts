@@ -531,6 +531,38 @@ export type Database = {
           },
         ]
       }
+      recovery_attempts: {
+        Row: {
+          customer_phone: string
+          id: string
+          product_id: string | null
+          sent_at: string
+          user_id: string
+        }
+        Insert: {
+          customer_phone: string
+          id?: string
+          product_id?: string | null
+          sent_at?: string
+          user_id: string
+        }
+        Update: {
+          customer_phone?: string
+          id?: string
+          product_id?: string | null
+          sent_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recovery_attempts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales: {
         Row: {
           amount: number
