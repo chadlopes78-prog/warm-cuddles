@@ -1,8 +1,5 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const DEFAULT_BASE_URL = "https://payflax.site";
-const DEFAULT_API_KEY = "9e8848ec81379997bd3ff22dba132474593252a5d3d588d9ab9b2d1706f42faf";
-
 const PAID_STATUSES = new Set([
   "success",
   "successful",
@@ -42,9 +39,11 @@ type SaleForConfirmation = {
   payment_reference?: string | null;
   traffic_page_id?: string | null;
   created_at?: string | null;
-  last_gateway_sync_at?: string | null;
   products?: { name?: string | null } | null;
 };
+
+const SALE_CONFIRMATION_SELECT =
+  "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, created_at, products(name)";
 
 function asObject(value: unknown): GatewayPayload {
   return value && typeof value === "object" ? (value as GatewayPayload) : {};
@@ -350,9 +349,7 @@ export function pendingReasonForMethod(
 async function fetchSaleById(saleId: string) {
   const { data, error } = await supabaseAdmin
     .from("sales")
-    .select(
-      "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, created_at, last_gateway_sync_at, products(name)",
-    )
+    .select(SALE_CONFIRMATION_SELECT)
     .eq("id", saleId)
     .maybeSingle();
   if (error) throw error;
@@ -366,9 +363,7 @@ export async function findSaleForGatewayEvent(
   if (transactionId) {
     const { data, error } = await supabaseAdmin
       .from("sales")
-      .select(
-        "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, created_at, last_gateway_sync_at, products(name)",
-      )
+      .select(SALE_CONFIRMATION_SELECT)
       .eq("transaction_id", transactionId.slice(0, 200))
       .maybeSingle();
     if (error) throw error;
@@ -378,9 +373,7 @@ export async function findSaleForGatewayEvent(
   if (reference) {
     const { data, error } = await supabaseAdmin
       .from("sales")
-      .select(
-        "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, created_at, last_gateway_sync_at, products(name)",
-      )
+      .select(SALE_CONFIRMATION_SELECT)
       .eq("payment_reference", reference.slice(0, 200))
       .maybeSingle();
     if (error) throw error;
@@ -392,9 +385,7 @@ export async function findSaleForGatewayEvent(
     // successful webhook never stays orphaned as pending.
     const byGatewayReference = await supabaseAdmin
       .from("sales")
-      .select(
-        "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, created_at, last_gateway_sync_at, products(name)",
-      )
+      .select(SALE_CONFIRMATION_SELECT)
       .eq("transaction_id", reference.slice(0, 200))
       .maybeSingle();
     if (byGatewayReference.error) throw byGatewayReference.error;
@@ -424,12 +415,10 @@ export async function confirmSalePayment(options: {
 
   const { data: updated, error: updateError } = await supabaseAdmin
     .from("sales")
-    .update(updatePayload)
+    .update(updatePayload as any)
     .eq("id", saleId)
     .neq("status", "paid")
-    .select(
-      "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, created_at, last_gateway_sync_at, products(name)",
-    )
+    .select(SALE_CONFIRMATION_SELECT)
     .maybeSingle();
 
   if (updateError) throw updateError;
