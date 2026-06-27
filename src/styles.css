@@ -144,6 +144,56 @@
   background-attachment: fixed;
 }
 
+/* Dark mode safety net: remap hardcoded light-mode utilities so numbers,
+   labels and surfaces remain legible across every dashboard tab. */
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-black { color: var(--color-foreground) !important; }
+
+.dark .text-slate-700,
+.dark .text-slate-600,
+.dark .text-gray-700,
+.dark .text-gray-600 { color: oklch(0.85 0.01 260) !important; }
+
+.dark .text-slate-500,
+.dark .text-slate-400,
+.dark .text-slate-300,
+.dark .text-gray-500,
+.dark .text-gray-400 { color: var(--color-muted-foreground) !important; }
+
+.dark .bg-white,
+.dark .bg-slate-50,
+.dark .bg-slate-100,
+.dark .bg-gray-50,
+.dark .bg-gray-100 { background-color: var(--color-card) !important; }
+
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-gray-100,
+.dark .border-gray-200 { border-color: var(--color-border) !important; }
+
+/* Soft tinted surfaces (red-50, amber-50, etc.) — keep the hue, drop the glare */
+.dark [class*="bg-red-50"] { background-color: oklch(0.3 0.08 25 / 0.35) !important; }
+.dark [class*="bg-amber-50"],
+.dark [class*="bg-yellow-50"] { background-color: oklch(0.3 0.08 75 / 0.35) !important; }
+.dark [class*="bg-emerald-50"],
+.dark [class*="bg-green-50"] { background-color: oklch(0.3 0.08 160 / 0.35) !important; }
+.dark [class*="bg-blue-50"],
+.dark [class*="bg-sky-50"],
+.dark [class*="bg-indigo-50"] { background-color: oklch(0.3 0.08 255 / 0.35) !important; }
+.dark [class*="bg-violet-50"],
+.dark [class*="bg-purple-50"] { background-color: oklch(0.3 0.08 295 / 0.35) !important; }
+.dark .border-red-100 { border-color: oklch(0.5 0.12 25 / 0.4) !important; }
+.dark .border-amber-100,
+.dark .border-yellow-100 { border-color: oklch(0.5 0.12 75 / 0.4) !important; }
+.dark .border-emerald-100,
+.dark .border-green-100 { border-color: oklch(0.5 0.12 160 / 0.4) !important; }
+.dark .border-blue-100,
+.dark .border-indigo-100 { border-color: oklch(0.5 0.12 255 / 0.4) !important; }
+
+
 @layer base {
   * {
     border-color: var(--color-border);

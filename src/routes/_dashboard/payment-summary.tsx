@@ -123,10 +123,10 @@ function PaymentSummaryPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">
+          <h1 className="text-2xl font-black tracking-tight text-foreground">
             Resumo por Método de Pagamento
           </h1>
-          <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-500">
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
             Apenas vendas confirmadas no período selecionado.
           </p>
@@ -144,26 +144,26 @@ function PaymentSummaryPage() {
             <MethodCard
               label="M-Pesa"
               icon={<Smartphone className="h-5 w-5" />}
-              accent="bg-red-50 text-red-600 border-red-100"
+              accent="bg-red-500/10 text-red-500 border-red-500/20"
               data={summary.mpesa}
             />
             <MethodCard
               label="e-Mola"
               icon={<Wallet className="h-5 w-5" />}
-              accent="bg-amber-50 text-amber-600 border-amber-100"
+              accent="bg-amber-500/10 text-amber-500 border-amber-500/20"
               data={summary.emola}
             />
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
-            <Card className="rounded-2xl border-slate-100 shadow-sm md:col-span-2">
+            <Card className="rounded-2xl border-border bg-card shadow-sm md:col-span-2">
               <CardHeader>
-                <CardTitle className="text-base font-bold">Distribuição por Método</CardTitle>
+                <CardTitle className="text-base font-bold text-foreground">Distribuição por Método</CardTitle>
               </CardHeader>
               <CardContent>
                 {pieData.length === 0 ? (
                   <div className="flex h-[280px] items-center justify-center">
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-300">
+                    <p className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">
                       Sem vendas confirmadas
                     </p>
                   </div>
@@ -188,7 +188,7 @@ function PaymentSummaryPage() {
                           innerRadius={70}
                           outerRadius={110}
                           paddingAngle={3}
-                          stroke="#fff"
+                          stroke="var(--color-card)"
                           strokeWidth={3}
                           isAnimationActive={false}
                         >
@@ -200,8 +200,10 @@ function PaymentSummaryPage() {
                           formatter={(v: number) => fmt(Number(v))}
                           contentStyle={{
                             borderRadius: 14,
-                            border: "1px solid #e2e8f0",
-                            boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.08)",
+                            border: "1px solid var(--color-border)",
+                            background: "var(--color-popover)",
+                            color: "var(--color-popover-foreground)",
+                            boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.25)",
                             fontSize: 12,
                             fontWeight: 700,
                           }}
@@ -214,7 +216,7 @@ function PaymentSummaryPage() {
                             fontSize: 11,
                             fontWeight: 800,
                             textTransform: "uppercase",
-                            color: "#475569",
+                            color: "var(--color-muted-foreground)",
                           }}
                         />
                       </PieChart>
@@ -224,27 +226,26 @@ function PaymentSummaryPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-2xl border-slate-100 shadow-sm">
+            <Card className="rounded-2xl border-border bg-card shadow-sm">
               <CardHeader>
-                <CardTitle className="text-base font-bold">Faturamento Líquido</CardTitle>
+                <CardTitle className="text-base font-bold text-foreground">Faturamento Líquido</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-3xl font-black tracking-tight text-slate-900">{fmt(summary.grand)}</p>
-                  <p className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-400">
+                  <p className="text-3xl font-black tracking-tight text-emerald-500">{fmt(summary.grand)}</p>
+                  <p className="mt-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     {summary.mpesa.count + summary.emola.count} transações · bruto {fmt(summary.grandGross)}
                   </p>
-                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600">
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-emerald-500/80">
                     Já descontado 15% + 15 MT por venda
                   </p>
                 </div>
-                <div className="space-y-2 border-t border-slate-100 pt-3">
+                <div className="space-y-2 border-t border-border pt-3">
                   <Row color={COLORS.mpesa} label="M-Pesa" value={fmt(summary.mpesa.total)} pct={summary.mpesa.pct} />
                   <Row color={COLORS.emola} label="e-Mola" value={fmt(summary.emola.total)} pct={summary.emola.pct} />
                 </div>
               </CardContent>
             </Card>
-
           </div>
         </>
       )}
@@ -257,15 +258,16 @@ function Row({ color, label, value, pct }: { color: string; label: string; value
     <div className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-2">
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-600">{label}</span>
+        <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
       </div>
       <div className="text-right">
-        <p className="text-sm font-bold text-slate-900">{value}</p>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{pct.toFixed(1)}%</p>
+        <p className="text-sm font-bold text-foreground">{value}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">{pct.toFixed(1)}%</p>
       </div>
     </div>
   );
 }
+
 
 function MethodCard({
   label,
@@ -276,20 +278,23 @@ function MethodCard({
   label: string;
   icon: React.ReactNode;
   accent: string;
-  data: { total: number; count: number; avg: number; pct: number };
+  data: { total: number; gross: number; count: number; avg: number; pct: number };
 }) {
   return (
-    <Card className="rounded-2xl border-slate-100 shadow-sm">
+    <Card className="rounded-2xl border-border bg-card shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base font-bold text-slate-900">{label}</CardTitle>
+        <CardTitle className="text-base font-bold text-foreground">{label}</CardTitle>
         <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${accent}`}>{icon}</div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Total líquido</p>
-          <p className="text-2xl font-black tracking-tight text-slate-900">{fmt(data.total)}</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total líquido</p>
+          <p className="text-2xl font-black tracking-tight text-emerald-500">{fmt(data.total)}</p>
+          <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+            Bruto {fmt(data.gross)}
+          </p>
         </div>
-        <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-2">
+        <div className="grid grid-cols-3 gap-3 border-t border-border pt-2">
           <Stat label="Transações" value={String(data.count)} />
           <Stat label="Ticket médio" value={fmt(data.avg)} icon={<TrendingUp className="h-3 w-3" />} />
           <Stat label="% do total" value={`${data.pct.toFixed(1)}%`} icon={<Percent className="h-3 w-3" />} />
@@ -302,11 +307,12 @@ function MethodCard({
 function Stat({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
     <div>
-      <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+      <p className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         {icon}
         {label}
       </p>
-      <p className="mt-1 truncate text-sm font-bold text-slate-900">{value}</p>
+      <p className="mt-1 truncate text-sm font-bold text-foreground">{value}</p>
     </div>
   );
 }
+
