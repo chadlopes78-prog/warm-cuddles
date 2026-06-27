@@ -56,10 +56,24 @@ export function WebhooksSection() {
   const { data: products } = useQuery({
     queryKey: ["webhook-products"],
     queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const uid = auth.user?.id;
+      if (!uid) return [] as Product[];
       const { data, error } = await supabase
-        .from("products").select("id, name").order("name");
+        .from("products")
+        .select("id, name")
+        .eq("user_id", uid)
+        .order("name");
       if (error) throw error;
-      return (data ?? []) as Product[];
+      // Deduplicate by id defensively in case of duplicate rows in cache
+      const seen = new Set<string>();
+      const unique: Product[] = [];
+      for (const p of (data ?? []) as Product[]) {
+        if (seen.has(p.id)) continue;
+        seen.add(p.id);
+        unique.push(p);
+      }
+      return unique;
     },
   });
 
