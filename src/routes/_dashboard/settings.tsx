@@ -483,7 +483,65 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary" />
+              <CardTitle>Integrações de Notificações</CardTitle>
+            </div>
+            <CardDescription>
+              Conecte a sua webhook do Pushcut para receber alertas instantâneos no seu dispositivo a cada venda aprovada.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="pushcut-url">Sua Pushcut Webhook URL</Label>
+              <Input
+                id="pushcut-url"
+                type="url"
+                placeholder="https://api.pushcut.io/SEU_TOKEN/notifications/NOME"
+                value={pushcutUrl}
+                onChange={(e) => setPushcutUrl(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div>
+                <p className="text-sm font-medium">Ativar notificações Pushcut</p>
+                <p className="text-xs text-muted-foreground">Envia notificação a cada venda aprovada.</p>
+              </div>
+              <Switch checked={pushcutEnabled} onCheckedChange={setPushcutEnabled} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Template da notificação</Label>
+              <Select value={pushcutTemplate} onValueChange={(v) => setPushcutTemplate(v as "simple" | "marketing")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="simple">Simples</SelectItem>
+                  <SelectItem value="marketing">Marketing</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {pushcutTemplate === "marketing"
+                  ? "🔥 Nova venda confirmada! Você recebeu X MT 🚀 · Produto · ID"
+                  : "Venda Realizada ✅ · Valor · Produto · Ticket"}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => updatePushcut.mutate()} disabled={updatePushcut.isPending}>
+                {updatePushcut.isPending ? "Salvando..." : "Salvar integração"}
+              </Button>
+              <Button variant="outline" onClick={handleTestPushcut} disabled={testingPushcut}>
+                {testingPushcut ? "Testando..." : "Testar conexão"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <WebhooksSection />
+
 
 
         <Card>
