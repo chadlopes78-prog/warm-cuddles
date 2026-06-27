@@ -379,6 +379,15 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
               <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="w-[150px]" />
             </>
           )}
+          <Button
+            size="sm"
+            onClick={handleSendAll}
+            disabled={sendingBulk || pendingToSend.length === 0}
+            className="bg-[#25D366] hover:bg-[#1DAE54] text-white"
+          >
+            <Send className="h-4 w-4 mr-1.5" />
+            {sendingBulk ? "Enviando..." : `Enviar para Todos os Pendentes${pendingToSend.length ? ` (${pendingToSend.length})` : ""}`}
+          </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" disabled={resetting}>
