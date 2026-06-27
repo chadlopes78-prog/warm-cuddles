@@ -508,8 +508,23 @@ async function dispatchApprovedSideEffects(
   const userId = sale.user_id as string | null;
   if (!userId) return;
 
+  // Add-on: per-user Pushcut from profile settings. Fire-and-forget; failures
+  // are swallowed inside sendProfilePushcut and never impact the checkout.
+  try {
+    const { sendProfilePushcut } = await import("@/lib/pushcut/profile.server");
+    void sendProfilePushcut({
+      id: sale.id,
+      user_id: userId,
+      amount: sale.amount as number | null,
+      product_id: sale.product_id ?? null,
+    });
+  } catch (e) {
+    console.error("[pushcut][profile] dispatch error (suppressed)", e);
+  }
+
   const { enqueueWebhookEvent, processPendingForUser } =
     await import("@/lib/webhooks/dispatcher.server");
+
   const productName = sale.products?.name ?? null;
   const payload = {
     sale_id: sale.id,

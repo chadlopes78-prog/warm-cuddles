@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Settings, Shield, Globe, Bell, User, History, MessageSquare, PieChart, Smartphone, Lock, Trash2, AlertTriangle } from "lucide-react";
+import { Settings, Shield, Globe, Bell, User, History, MessageSquare, PieChart, Smartphone, Lock, Trash2, AlertTriangle, Zap } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { PushNotificationManager } from "@/components/dashboard/PushNotificationManager";
 import { WebhooksSection } from "@/components/dashboard/WebhooksSection";
@@ -7,10 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { testPushcut } from "@/lib/pushcut/profile.functions";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +35,11 @@ function SettingsPage() {
   const queryClient = useQueryClient();
   const [fullName, setFullName] = useState("");
   const [pushcutUrl, setPushcutUrl] = useState("");
+  const [pushcutEnabled, setPushcutEnabled] = useState(true);
+  const [pushcutTemplate, setPushcutTemplate] = useState<"simple" | "marketing">("simple");
+  const [testingPushcut, setTestingPushcut] = useState(false);
+  const testPushcutFn = useServerFn(testPushcut);
+
   const [mpesaNumber, setMpesaNumber] = useState("");
   const [emolaNumber, setEmolaNumber] = useState("");
   const [editingMpesa, setEditingMpesa] = useState(false);
@@ -60,10 +69,12 @@ function SettingsPage() {
 
   useEffect(() => {
     if (profile?.full_name) setFullName(profile.full_name);
-    if (profile?.pushcut_url !== undefined && profile?.pushcut_url !== null) {
-      setPushcutUrl(profile.pushcut_url);
-    }
+    const p = profile as { pushcut_url?: string | null; pushcut_enabled?: boolean | null; pushcut_template?: string | null } | null;
+    if (p?.pushcut_url !== undefined && p?.pushcut_url !== null) setPushcutUrl(p.pushcut_url);
+    if (p?.pushcut_enabled !== undefined && p?.pushcut_enabled !== null) setPushcutEnabled(!!p.pushcut_enabled);
+    if (p?.pushcut_template === "marketing" || p?.pushcut_template === "simple") setPushcutTemplate(p.pushcut_template);
   }, [profile]);
+
 
   const formatSaved = (v: string) => (v.startsWith("258") ? v.slice(3) : v);
 
@@ -128,21 +139,50 @@ function SettingsPage() {
   });
 
   const updatePushcut = useMutation({
-    mutationFn: async (url: string) => {
+    mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Não autenticado");
+      const url = pushcutUrl.trim();
+      if (url && !/^https?:\/\/.+/i.test(url)) {
+        throw new Error("URL inválida. Use uma URL https://...");
+      }
       const { error } = await supabase
         .from("profiles")
-        .update({ pushcut_url: url || null, updated_at: new Date().toISOString() })
+        .update({
+          pushcut_url: url || null,
+          pushcut_enabled: pushcutEnabled,
+          pushcut_template: pushcutTemplate,
+          updated_at: new Date().toISOString(),
+        } as never)
         .eq("id", user.id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
-      toast.success("Link Pushcut salvo!");
+      toast.success("Integração Pushcut salva!");
     },
     onError: (error: any) => toast.error("Erro ao salvar: " + error.message),
   });
+
+  const handleTestPushcut = async () => {
+    const url = pushcutUrl.trim();
+    if (!url) {
+      toast.error("Informe a URL da Pushcut antes de testar.");
+      return;
+    }
+    setTestingPushcut(true);
+    try {
+      const res = (await testPushcutFn({ data: { url } })) as { ok: boolean; status: number; message?: string };
+      if (res.ok) toast.success("Pushcut conectado com sucesso!");
+      else toast.error(`Falha no teste: ${res.message ?? `HTTP ${res.status}`}`);
+
+    } catch (e) {
+      toast.error("Erro ao testar: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setTestingPushcut(false);
+    }
+  };
+
 
   const updateProfile = useMutation({
     mutationFn: async (name: string) => {
@@ -443,7 +483,65 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary" />
+              <CardTitle>Integrações de Notificações</CardTitle>
+            </div>
+            <CardDescription>
+              Conecte a sua webhook do Pushcut para receber alertas instantâneos no seu dispositivo a cada venda aprovada.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="pushcut-url">Sua Pushcut Webhook URL</Label>
+              <Input
+                id="pushcut-url"
+                type="url"
+                placeholder="https://api.pushcut.io/SEU_TOKEN/notifications/NOME"
+                value={pushcutUrl}
+                onChange={(e) => setPushcutUrl(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div>
+                <p className="text-sm font-medium">Ativar notificações Pushcut</p>
+                <p className="text-xs text-muted-foreground">Envia notificação a cada venda aprovada.</p>
+              </div>
+              <Switch checked={pushcutEnabled} onCheckedChange={setPushcutEnabled} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Template da notificação</Label>
+              <Select value={pushcutTemplate} onValueChange={(v) => setPushcutTemplate(v as "simple" | "marketing")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="simple">Simples</SelectItem>
+                  <SelectItem value="marketing">Marketing</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {pushcutTemplate === "marketing"
+                  ? "🔥 Nova venda confirmada! Você recebeu X MT 🚀 · Produto · ID"
+                  : "Venda Realizada ✅ · Valor · Produto · Ticket"}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => updatePushcut.mutate()} disabled={updatePushcut.isPending}>
+                {updatePushcut.isPending ? "Salvando..." : "Salvar integração"}
+              </Button>
+              <Button variant="outline" onClick={handleTestPushcut} disabled={testingPushcut}>
+                {testingPushcut ? "Testando..." : "Testar conexão"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <WebhooksSection />
+
 
 
         <Card>
