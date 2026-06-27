@@ -269,15 +269,17 @@ function CheckoutPage() {
     }
   }, [pixelId, product?.id]);
 
-  const trackEvent = (event: string) => {
+  const trackEvent = (event: string, extra?: Record<string, unknown>, eventID?: string) => {
     try {
       if (pixelId && window.fbq) {
+        const opts = eventID ? { eventID } : undefined;
         window.fbq('track', event, {
-          content_name: product.name, value: product.price, currency: 'MZN',
-        });
+          content_name: product.name, value: product.price, currency: 'MZN', ...extra,
+        }, opts);
       }
     } catch (e) { console.error(e); }
   };
+
 
   // Normalize phone input: strip non-digits, drop leading "258" or "0" so the
   // server-side regex (^258\d{9}$) and prefix checks pass without surprises.
