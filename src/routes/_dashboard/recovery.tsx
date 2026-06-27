@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { MessageSquare, MessageCircle, CheckCircle2, Clock, TrendingUp, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
 import {
@@ -15,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { logRecoveryAttempt } from "@/lib/api/recovery.functions";
 
 export const Route = createFileRoute("/_dashboard/recovery")({
   component: RecoveryPage,
@@ -42,6 +44,7 @@ type RecoveryItem = {
   customerName: string;
   customerPhone: string;
   productName: string;
+  productId: string | null;
   productLinkId: string | null;
   amount: number;
   lastAttemptAt: string;
@@ -76,6 +79,7 @@ function timeAgo(iso: string) {
 
 function RecoveryPage() {
   const [search, setSearch] = useState("");
+  const logAttempt = useServerFn(logRecoveryAttempt);
 
   const { data: sales = [], isLoading } = useQuery({
     queryKey: ["recovery-sales"],
@@ -95,6 +99,32 @@ function RecoveryPage() {
     refetchInterval: 30_000,
   });
 
+  const { data: attempts = [], refetch: refetchAttempts } = useQuery({
+    queryKey: ["recovery-attempts"],
+    queryFn: async () => {
+      const since = new Date(Date.now() - ABANDONED_WINDOW_DAYS * 86400_000).toISOString();
+      const { data, error } = await (supabase.from as any)("recovery_attempts")
+        .select("product_id, customer_phone, sent_at")
+        .gte("sent_at", since)
+        .order("sent_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as Array<{ product_id: string | null; customer_phone: string; sent_at: string }>;
+    },
+    refetchInterval: 30_000,
+  });
+
+  const attemptKey = (phone: string, productId: string | null | undefined) =>
+    `${normalizePhone(phone)}::${productId ?? ""}`;
+
+  const firstAttemptByKey = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const a of attempts) {
+      const k = attemptKey(a.customer_phone, a.product_id);
+      if (!m.has(k)) m.set(k, a.sent_at);
+    }
+    return m;
+  }, [attempts]);
+
   const items: RecoveryItem[] = useMemo(() => {
     const groups = new Map<string, SaleRow[]>();
     for (const s of sales) {
@@ -109,26 +139,32 @@ function RecoveryPage() {
     const out: RecoveryItem[] = [];
     for (const [key, rows] of groups) {
       rows.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
-      const paid = rows.find((r) => SUCCESS_STATUSES.includes((r.status ?? "").toLowerCase()));
       const abandoned = rows.filter((r) => !SUCCESS_STATUSES.includes((r.status ?? "").toLowerCase()));
-      if (abandoned.length === 0 && !paid) continue;
+      if (abandoned.length === 0) continue; // only show real abandoned checkouts
       const latestAbandoned = abandoned[0];
-      const reference = latestAbandoned ?? paid!;
+      const reference = latestAbandoned;
       const amount = Number(reference.amount ?? 0) + (reference.bump_accepted ? Number(reference.bump_amount ?? 0) : 0);
 
+      // Recovery only counts when a recovery attempt was logged AND a paid sale exists after it
+      const attemptAt = firstAttemptByKey.get(key);
       let status: RecoveryItem["status"];
       let recoveredAt: string | null = null;
-      if (paid && (!latestAbandoned || new Date(paid.created_at) > new Date(latestAbandoned.created_at))) {
-        // paid happened (possibly after an abandoned attempt) — recovered only if there's a prior abandoned
-        const priorAbandoned = abandoned.find((a) => new Date(a.created_at) < new Date(paid.created_at));
-        if (!priorAbandoned) continue; // pure successful sale, not a recovery case
-        status = "recovered";
-        recoveredAt = paid.created_at;
-      } else if (latestAbandoned) {
+      if (attemptAt) {
+        const paidAfter = rows.find(
+          (r) =>
+            SUCCESS_STATUSES.includes((r.status ?? "").toLowerCase()) &&
+            new Date(r.created_at) >= new Date(attemptAt),
+        );
+        if (paidAfter) {
+          status = "recovered";
+          recoveredAt = paidAfter.created_at;
+        } else {
+          const ageH = (Date.now() - new Date(latestAbandoned.created_at).getTime()) / 3600_000;
+          status = ageH > EXPIRE_AFTER_HOURS ? "expired" : "pending";
+        }
+      } else {
         const ageH = (Date.now() - new Date(latestAbandoned.created_at).getTime()) / 3600_000;
         status = ageH > EXPIRE_AFTER_HOURS ? "expired" : "pending";
-      } else {
-        continue;
       }
 
       out.push({
@@ -136,6 +172,7 @@ function RecoveryPage() {
         customerName: reference.customer_name ?? "Cliente",
         customerPhone: reference.customer_phone ?? "",
         productName: reference.products?.name ?? "Produto",
+        productId: reference.product_id ?? reference.products?.id ?? null,
         productLinkId: reference.products?.custom_url || reference.products?.id || reference.product_id,
         amount,
         lastAttemptAt: reference.created_at,
@@ -145,7 +182,7 @@ function RecoveryPage() {
     }
     out.sort((a, b) => +new Date(b.lastAttemptAt) - +new Date(a.lastAttemptAt));
     return out;
-  }, [sales]);
+  }, [sales, firstAttemptByKey]);
 
   const filtered = items.filter((i) => {
     if (!search.trim()) return true;
@@ -275,6 +312,14 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
                               href={buildWhatsAppLink(item)}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={() => {
+                                logAttempt({
+                                  data: {
+                                    productId: item.productId,
+                                    customerPhone: item.customerPhone,
+                                  },
+                                }).then(() => refetchAttempts()).catch(() => {});
+                              }}
                             >
                               <MessageCircle className="h-4 w-4 mr-1.5" />
                               Recuperar Venda
