@@ -129,6 +129,52 @@ function CheckoutPage() {
     return () => clearInterval(timer);
   }, []);
 
+  // Poll sale status in-place after gateway dispatch — no redirect to a waiting page.
+  useEffect(() => {
+    if (!pendingSaleId) return;
+    let cancelled = false;
+    let attempts = 0;
+    const MAX = 80;
+    const TERMINAL_OK = ["paid", "approved", "success", "completed"];
+    const TERMINAL_FAIL = ["failed", "expired", "cancelled", "canceled"];
+    (async () => {
+      while (!cancelled && attempts < MAX) {
+        attempts++;
+        try {
+          const r = (await pollFn({ data: { saleId: pendingSaleId } })) as
+            | { sale?: { status?: string | null } | null; product?: { thank_you_url?: string | null } | null }
+            | null;
+          if (cancelled) return;
+          const status = String(r?.sale?.status ?? "").toLowerCase();
+          if (TERMINAL_OK.includes(status)) {
+            setPaymentConfirmed(true);
+            setProcessingPayment(false);
+            setPaymentStatusMessage("Pagamento aprovado! Obrigado.");
+            const url = r?.product?.thank_you_url?.trim();
+            if (url) {
+              setTimeout(() => window.location.replace(url), 800);
+            }
+            return;
+          }
+          if (TERMINAL_FAIL.includes(status)) {
+            setProcessingPayment(false);
+            setPaymentStatusMessage(null);
+            setPaymentErrorMessage("Pagamento não concluído. Tente novamente.");
+            setPaymentErrorCode("gateway");
+            setPaymentRetryable(true);
+            setPendingSaleId(null);
+            return;
+          }
+        } catch (e) {
+          console.error("[checkout] poll error", e);
+        }
+        await new Promise((r) => setTimeout(r, attempts < 25 ? 1500 : 3000));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [pendingSaleId, pollFn]);
+
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
