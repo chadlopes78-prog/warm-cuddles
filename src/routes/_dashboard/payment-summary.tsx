@@ -286,7 +286,7 @@ function MethodCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Total confirmado</p>
+          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Total líquido</p>
           <p className="text-2xl font-black tracking-tight text-slate-900">{fmt(data.total)}</p>
         </div>
         <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-2">
