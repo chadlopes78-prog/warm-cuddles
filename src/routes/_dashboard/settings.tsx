@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Settings, Shield, Globe, Bell, User, History, MessageSquare, PieChart, Smartphone, Lock, Trash2, AlertTriangle, Zap } from "lucide-react";
+import { Settings, Shield, Globe, Bell, User, History, MessageSquare, PieChart, Smartphone, Lock, Trash2, AlertTriangle } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { PushNotificationManager } from "@/components/dashboard/PushNotificationManager";
 import { WebhooksSection } from "@/components/dashboard/WebhooksSection";
@@ -7,11 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { testPushcut } from "@/lib/pushcut/profile.functions";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 
