@@ -541,6 +541,8 @@ export type Database = {
           customer_name: string | null
           customer_phone: string | null
           id: string
+          payment_confirmed_at: string | null
+          payment_failed_at: string | null
           payment_method: string | null
           payment_reference: string | null
           product_id: string | null
@@ -559,6 +561,8 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          payment_confirmed_at?: string | null
+          payment_failed_at?: string | null
           payment_method?: string | null
           payment_reference?: string | null
           product_id?: string | null
@@ -577,6 +581,8 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          payment_confirmed_at?: string | null
+          payment_failed_at?: string | null
           payment_method?: string | null
           payment_reference?: string | null
           product_id?: string | null
