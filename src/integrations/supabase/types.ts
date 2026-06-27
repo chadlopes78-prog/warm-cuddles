@@ -409,6 +409,8 @@ export type Database = {
           payout_method: string | null
           payout_mpesa: string | null
           payout_number: string | null
+          pushcut_enabled: boolean
+          pushcut_template: string
           pushcut_url: string | null
           role: string | null
           status: string | null
@@ -425,6 +427,8 @@ export type Database = {
           payout_method?: string | null
           payout_mpesa?: string | null
           payout_number?: string | null
+          pushcut_enabled?: boolean
+          pushcut_template?: string
           pushcut_url?: string | null
           role?: string | null
           status?: string | null
@@ -441,6 +445,8 @@ export type Database = {
           payout_method?: string | null
           payout_mpesa?: string | null
           payout_number?: string | null
+          pushcut_enabled?: boolean
+          pushcut_template?: string
           pushcut_url?: string | null
           role?: string | null
           status?: string | null
