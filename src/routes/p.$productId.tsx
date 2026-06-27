@@ -423,7 +423,9 @@ function CheckoutPage() {
                 required
                 inputMode="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(sanitizePhone(e.target.value))}
+                maxLength={9}
+
                 className="h-12 pl-[72px] border-slate-200 rounded-xl bg-slate-50/50 text-sm font-medium placeholder:text-slate-400 focus-visible:ring-2 focus-visible:bg-white"
                 style={{ ['--tw-ring-color' as any]: accent }}
               />
