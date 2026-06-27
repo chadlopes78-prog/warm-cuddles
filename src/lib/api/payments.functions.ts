@@ -361,8 +361,8 @@ export const processPayment = createServerFn({ method: "POST" })
       payout_method: payoutMethod,
       transaction_reference: reference,
     };
-    const publicUrl = configuredPublicUrl();
-    if (publicUrl) earlyBody.callback_url = `${publicUrl}/api/public/payment-webhook`;
+    const callbackUrl = configuredWebhookUrl();
+    if (callbackUrl) earlyBody.callback_url = callbackUrl;
     if (gatewayMethod === "emola_c2b") earlyBody.name = customerName.slice(0, 60);
 
     const earlyController: AbortController = new AbortController();
