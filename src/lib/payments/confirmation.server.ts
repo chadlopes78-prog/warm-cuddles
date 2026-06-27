@@ -580,19 +580,13 @@ async function dispatchApprovedSideEffects(
   const userId = sale.user_id as string | null;
   if (!userId) return;
 
-  // Add-on: per-user Pushcut from profile settings. Fire-and-forget; failures
-  // are swallowed inside sendProfilePushcut and never impact the checkout.
-  try {
-    const { sendProfilePushcut } = await import("@/lib/pushcut/profile.server");
-    void sendProfilePushcut({
-      id: sale.id,
-      user_id: userId,
-      amount: sale.amount as number | null,
-      product_id: sale.product_id ?? null,
-    });
-  } catch (e) {
-    console.error("[pushcut][profile] dispatch error (suppressed)", e);
-  }
+  // SINGLE-CHANNEL POLICY: Pushcut é entregue exclusivamente via
+  // `webhook_endpoints` (is_pushcut=true) configurados pelo utilizador
+  // em "Webhooks e Eventos". A via legada baseada em `profiles.pushcut_url`
+  // foi desativada para eliminar duplicações por venda. A dedupe é feita
+  // por `webhook_deliveries.dedupe_key = approved:${saleId}:${endpointId}`
+  // mais o lock por `pushcut_logs.order_id` em `sendPushcutOnce`.
+
 
   const { enqueueWebhookEvent, processPendingForUser } =
     await import("@/lib/webhooks/dispatcher.server");
