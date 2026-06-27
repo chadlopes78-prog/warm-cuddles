@@ -1,5 +1,8 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
+const DEFAULT_BASE_URL = "https://payflax.site";
+const DEFAULT_API_KEY = "9e8848ec81379997bd3ff22dba132474593252a5d3d588d9ab9b2d1706f42faf";
+
 const PAID_STATUSES = new Set([
   "success",
   "successful",
@@ -38,6 +41,8 @@ type SaleForConfirmation = {
   transaction_id?: string | null;
   payment_reference?: string | null;
   traffic_page_id?: string | null;
+  created_at?: string | null;
+  last_gateway_sync_at?: string | null;
   products?: { name?: string | null } | null;
 };
 
@@ -346,7 +351,7 @@ async function fetchSaleById(saleId: string) {
   const { data, error } = await supabaseAdmin
     .from("sales")
     .select(
-      "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, products(name)",
+      "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, created_at, last_gateway_sync_at, products(name)",
     )
     .eq("id", saleId)
     .maybeSingle();
@@ -362,7 +367,7 @@ export async function findSaleForGatewayEvent(
     const { data, error } = await supabaseAdmin
       .from("sales")
       .select(
-        "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, products(name)",
+        "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, created_at, last_gateway_sync_at, products(name)",
       )
       .eq("transaction_id", transactionId.slice(0, 200))
       .maybeSingle();
@@ -374,12 +379,26 @@ export async function findSaleForGatewayEvent(
     const { data, error } = await supabaseAdmin
       .from("sales")
       .select(
-        "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, products(name)",
+        "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, created_at, last_gateway_sync_at, products(name)",
       )
       .eq("payment_reference", reference.slice(0, 200))
       .maybeSingle();
     if (error) throw error;
-    return data;
+    if (data) return data;
+
+    // Payflax names its own gateway identifier `transaction_reference`.
+    // Some callbacks send only that field, while our local `payment_reference`
+    // stores the PMZ... idempotency key. Resolve both possibilities so a real
+    // successful webhook never stays orphaned as pending.
+    const byGatewayReference = await supabaseAdmin
+      .from("sales")
+      .select(
+        "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, created_at, last_gateway_sync_at, products(name)",
+      )
+      .eq("transaction_id", reference.slice(0, 200))
+      .maybeSingle();
+    if (byGatewayReference.error) throw byGatewayReference.error;
+    return byGatewayReference.data;
   }
 
   return null;
@@ -394,10 +413,12 @@ export async function confirmSalePayment(options: {
 }) {
   const { saleId, transactionId, reference, rawPayload, triggerPushcut = false } = options;
 
-  const updatePayload: { status: string; payment_reference: string; transaction_id?: string; status_reason: null } = {
+  const updatePayload: Record<string, unknown> = {
     status: "paid",
     payment_reference: reference ? reference.slice(0, 200) : paymentReferenceForSale(saleId),
     status_reason: null,
+    payment_confirmed_at: new Date().toISOString(),
+    payment_failed_at: null,
   };
   if (transactionId) updatePayload.transaction_id = transactionId.slice(0, 200);
 
@@ -407,7 +428,7 @@ export async function confirmSalePayment(options: {
     .eq("id", saleId)
     .neq("status", "paid")
     .select(
-      "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, products(name)",
+      "id, status, user_id, product_id, customer_name, customer_phone, amount, payment_method, transaction_id, payment_reference, traffic_page_id, created_at, last_gateway_sync_at, products(name)",
     )
     .maybeSingle();
 
@@ -424,13 +445,7 @@ export async function confirmSalePayment(options: {
         .eq("id", saleId)
         .eq("status", "paid");
     }
-    const currentSale = await fetchSaleById(saleId);
-    if (currentSale?.status === "paid") {
-      await dispatchApprovedSideEffects(currentSale, rawPayload, triggerPushcut).catch((err) => {
-        console.error("[payments] approved side-effects retry failed", err);
-      });
-    }
-    return { sale: currentSale, becamePaid: false };
+    return { sale: await fetchSaleById(saleId), becamePaid: false };
   }
 
   await dispatchApprovedSideEffects(updated, rawPayload, triggerPushcut).catch((err) => {
@@ -462,6 +477,7 @@ export async function markSaleTerminalFailure(options: {
   const updatePayload: Record<string, unknown> = {
     status: finalStatus,
     status_reason: reasonInfo.label,
+    payment_failed_at: new Date().toISOString(),
   };
   if (transactionId) updatePayload.transaction_id = transactionId.slice(0, 200);
   if (reference) updatePayload.payment_reference = reference.slice(0, 200);
