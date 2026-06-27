@@ -109,6 +109,9 @@ function CheckoutPage() {
   const [paymentErrorMessage, setPaymentErrorMessage] = useState<string | null>(null);
   const [paymentErrorCode, setPaymentErrorCode] = useState<string | null>(null);
   const [paymentRetryable, setPaymentRetryable] = useState(false);
+  const [pendingSaleId, setPendingSaleId] = useState<string | null>(null);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const pollFn = useServerFn(getPaymentSuccessData);
 
 
   const [name, setName] = useState("");
