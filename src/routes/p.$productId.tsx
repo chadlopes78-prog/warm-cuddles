@@ -154,8 +154,17 @@ function CheckoutPage() {
           if (cancelled) return;
           const status = String(r?.sale?.status ?? "").toLowerCase();
           if (TERMINAL_OK.includes(status)) {
+            // Fire the REAL Purchase event exactly once, deduped with the
+            // server-side CAPI call via `eventID = pendingSaleId`. Meta
+            // matches event_id within 48h and counts as a single Purchase.
+            trackEvent(
+              "Purchase",
+              { content_ids: [product.id], content_type: "product" },
+              pendingSaleId ?? undefined,
+            );
             setPaymentConfirmed(true);
             setProcessingPayment(false);
+
             const rawUrl =
               r?.product?.thank_you_url?.trim() ||
               r?.product?.access_link?.trim() ||
