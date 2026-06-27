@@ -64,11 +64,8 @@ function SettingsPage() {
 
   useEffect(() => {
     if (profile?.full_name) setFullName(profile.full_name);
-    const p = profile as { pushcut_url?: string | null; pushcut_enabled?: boolean | null; pushcut_template?: string | null } | null;
-    if (p?.pushcut_url !== undefined && p?.pushcut_url !== null) setPushcutUrl(p.pushcut_url);
-    if (p?.pushcut_enabled !== undefined && p?.pushcut_enabled !== null) setPushcutEnabled(!!p.pushcut_enabled);
-    if (p?.pushcut_template === "marketing" || p?.pushcut_template === "simple") setPushcutTemplate(p.pushcut_template);
   }, [profile]);
+
 
 
   const formatSaved = (v: string) => (v.startsWith("258") ? v.slice(3) : v);
