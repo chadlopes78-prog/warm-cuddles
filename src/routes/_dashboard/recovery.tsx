@@ -313,6 +313,13 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
     [periodItems],
   );
 
+  const isValidMozPhone = (raw: string) => {
+    const digits = (raw ?? "").replace(/\D/g, "");
+    const local = digits.startsWith("258") ? digits.slice(3) : digits;
+    // Mobile MZ: 9 digits starting with 8, valid second digit 2-7
+    return local.length === 9 && /^8[2-7]\d{7}$/.test(local);
+  };
+
   const handleSendAll = async () => {
     if (sendingBulk) return;
     const targets = pendingToSend;
@@ -323,29 +330,95 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
     setSendingBulk(true);
     let sent = 0;
     let failed = 0;
+    let ignored = 0;
+    let popupBlocked = false;
+    const sendLog: Array<{ name: string; phone: string; status: "Enviado" | "Falhou" | "Ignorado"; reason?: string }> = [];
     toast.info(`Enviando ${targets.length} mensagem(ns)... mantenha esta aba aberta.`);
+
     for (const item of targets) {
+      // 1) Ignore invalid / empty numbers — never break the loop
+      if (!item.customerPhone?.trim() || !isValidMozPhone(item.customerPhone)) {
+        ignored++;
+        sendLog.push({
+          name: item.customerName,
+          phone: item.customerPhone || "(vazio)",
+          status: "Ignorado",
+          reason: "Número inválido ou sem WhatsApp",
+        });
+        console.warn(`[Recovery] Ignorado: ${item.customerName} (${item.customerPhone || "vazio"}) — número inválido`);
+        continue;
+      }
+
+      // 2) Try to open WhatsApp + log attempt; isolate failures per contact
       try {
         const url = buildWhatsAppLink(item);
-        const win = window.open(url, "_blank", "noopener,noreferrer");
-        if (!win) {
-          failed++;
-          toast.error("O navegador bloqueou novas abas. Permita pop-ups para esta página.");
-          break;
+        let opened: Window | null = null;
+        try {
+          opened = window.open(url, "_blank", "noopener,noreferrer");
+        } catch {
+          opened = null;
         }
-        await logAttempt({
-          data: { productId: item.productId, customerPhone: item.customerPhone },
-        });
+        if (!opened) {
+          popupBlocked = true;
+          failed++;
+          sendLog.push({
+            name: item.customerName,
+            phone: item.customerPhone,
+            status: "Falhou",
+            reason: "Pop-up bloqueado pelo navegador",
+          });
+          console.warn(`[Recovery] Falhou (pop-up): ${item.customerName} (${item.customerPhone})`);
+          continue; // keep going — do not stop the queue
+        }
+
+        try {
+          await logAttempt({
+            data: { productId: item.productId, customerPhone: item.customerPhone },
+          });
+        } catch (logErr) {
+          // Attempt registration failed but WhatsApp opened — count as sent, log warning
+          console.warn(`[Recovery] Falha ao registrar tentativa de ${item.customerName}:`, logErr);
+        }
+
         sent++;
+        sendLog.push({ name: item.customerName, phone: item.customerPhone, status: "Enviado" });
+        console.info(`[Recovery] Enviado: ${item.customerName} (${item.customerPhone})`);
+      } catch (err) {
+        failed++;
+        sendLog.push({
+          name: item.customerName,
+          phone: item.customerPhone,
+          status: "Falhou",
+          reason: (err as Error)?.message ?? "Erro desconhecido",
+        });
+        console.error(`[Recovery] Falhou: ${item.customerName} (${item.customerPhone})`, err);
+      }
+
+      // Throttle between sends — also wrapped so a timer hiccup can never stop us
+      try {
         await new Promise((r) => setTimeout(r, 600));
       } catch {
-        failed++;
+        /* noop */
       }
     }
-    await refetchAttempts();
+
+    console.table(sendLog);
+    await refetchAttempts().catch(() => {});
     setSendingBulk(false);
-    if (sent > 0) toast.success(`${sent} mensagem(ns) enviada(s). Clientes marcados como "Contato Enviado".`);
-    if (failed > 0 && sent === 0) toast.error("Não foi possível enviar as mensagens.");
+
+    const parts: string[] = [];
+    if (sent > 0) parts.push(`${sent} enviada(s)`);
+    if (failed > 0) parts.push(`${failed} falhou(aram)`);
+    if (ignored > 0) parts.push(`${ignored} ignorada(s)`);
+    const summary = parts.join(" · ") || "Nenhum envio processado.";
+
+    if (sent > 0) toast.success(`Processo concluído: ${summary}`);
+    else if (ignored > 0 && failed === 0) toast.warning(`Processo concluído: ${summary}`);
+    else toast.error(`Processo concluído: ${summary}`);
+
+    if (popupBlocked) {
+      toast.error("Algumas abas foram bloqueadas. Permita pop-ups para esta página e tente novamente.");
+    }
   };
 
   const periodLabel =
