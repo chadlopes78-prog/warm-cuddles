@@ -75,32 +75,40 @@ function PaymentSummaryPage() {
 
   const summary = useMemo(() => {
     const acc = {
-      mpesa: { total: 0, count: 0 },
-      emola: { total: 0, count: 0 },
+      mpesa: { gross: 0, net: 0, count: 0 },
+      emola: { gross: 0, net: 0, count: 0 },
     };
     for (const s of sales) {
       if (!SUCCESS.has((s.status || "").toLowerCase())) continue;
       const m = methodOf(s.payment_method);
       if (m === "other") continue;
       const amt = Number(s.amount || 0) + Number(s.bump_amount || 0);
-      acc[m].total += amt;
+      const net = Math.max(0, amt - amt * 0.15 - 15);
+      acc[m].gross += amt;
+      acc[m].net += net;
       acc[m].count += 1;
     }
-    const grand = acc.mpesa.total + acc.emola.total;
+    const grandNet = acc.mpesa.net + acc.emola.net;
     return {
       mpesa: {
-        ...acc.mpesa,
-        avg: acc.mpesa.count ? acc.mpesa.total / acc.mpesa.count : 0,
-        pct: grand ? (acc.mpesa.total / grand) * 100 : 0,
+        total: acc.mpesa.net,
+        gross: acc.mpesa.gross,
+        count: acc.mpesa.count,
+        avg: acc.mpesa.count ? acc.mpesa.net / acc.mpesa.count : 0,
+        pct: grandNet ? (acc.mpesa.net / grandNet) * 100 : 0,
       },
       emola: {
-        ...acc.emola,
-        avg: acc.emola.count ? acc.emola.total / acc.emola.count : 0,
-        pct: grand ? (acc.emola.total / grand) * 100 : 0,
+        total: acc.emola.net,
+        gross: acc.emola.gross,
+        count: acc.emola.count,
+        avg: acc.emola.count ? acc.emola.net / acc.emola.count : 0,
+        pct: grandNet ? (acc.emola.net / grandNet) * 100 : 0,
       },
-      grand,
+      grand: grandNet,
+      grandGross: acc.mpesa.gross + acc.emola.gross,
     };
   }, [sales]);
+
 
   const pieData = useMemo(
     () =>
