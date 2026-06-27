@@ -172,9 +172,10 @@ function SettingsPage() {
     }
     setTestingPushcut(true);
     try {
-      const res = await testPushcutFn({ data: { url } });
+      const res = (await testPushcutFn({ data: { url } })) as { ok: boolean; status: number; message?: string };
       if (res.ok) toast.success("Pushcut conectado com sucesso!");
       else toast.error(`Falha no teste: ${res.message ?? `HTTP ${res.status}`}`);
+
     } catch (e) {
       toast.error("Erro ao testar: " + (e instanceof Error ? e.message : String(e)));
     } finally {
