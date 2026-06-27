@@ -408,7 +408,14 @@ export async function confirmSalePayment(options: {
 }) {
   const { saleId, transactionId, reference, rawPayload, triggerPushcut = false } = options;
 
-  const updatePayload: Record<string, unknown> = {
+  const updatePayload: {
+    status: string;
+    payment_reference: string;
+    status_reason: null;
+    payment_confirmed_at: string;
+    payment_failed_at: null;
+    transaction_id?: string;
+  } = {
     status: "paid",
     payment_reference: reference ? reference.slice(0, 200) : paymentReferenceForSale(saleId),
     status_reason: null,
@@ -419,7 +426,7 @@ export async function confirmSalePayment(options: {
 
   const { data: updated, error: updateError } = await supabaseAdmin
     .from("sales")
-    .update(updatePayload as any)
+    .update(updatePayload)
     .eq("id", saleId)
     .neq("status", "paid")
     .select(SALE_CONFIRMATION_SELECT)
@@ -467,7 +474,13 @@ export async function markSaleTerminalFailure(options: {
   // Only set payment_reference when a real gateway reference is supplied.
   // Never fall back to the human-readable reason — it's not unique and
   // collides with `sales_payment_reference_unique` across stale rows.
-  const updatePayload: Record<string, unknown> = {
+  const updatePayload: {
+    status: string;
+    status_reason: string;
+    payment_failed_at: string;
+    transaction_id?: string;
+    payment_reference?: string;
+  } = {
     status: finalStatus,
     status_reason: reasonInfo.label,
     payment_failed_at: new Date().toISOString(),
@@ -476,7 +489,7 @@ export async function markSaleTerminalFailure(options: {
   if (reference) updatePayload.payment_reference = reference.slice(0, 200);
   const { data: updated, error } = await supabaseAdmin
     .from("sales")
-    .update(updatePayload as any)
+    .update(updatePayload)
     .eq("id", saleId)
     .neq("status", "paid")
     .neq("status", "failed")
