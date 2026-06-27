@@ -101,6 +101,17 @@ function joinUrl(base: string, path: string) {
   return `${base.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
 }
 
+function configuredPublicUrl() {
+  const raw =
+    process.env.PAYMENT_CALLBACK_URL ||
+    process.env.PAYMENT_WEBHOOK_URL ||
+    process.env.PUBLIC_SITE_URL ||
+    process.env.APP_URL ||
+    process.env.SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+  return raw ? raw.replace(/\/+$/, "") : "";
+}
+
 export const processPayment = createServerFn({ method: "POST" })
   .inputValidator(PaymentInput)
   .handler(async ({ data }): Promise<PaymentResult> => {
@@ -296,7 +307,10 @@ export const processPayment = createServerFn({ method: "POST" })
       amount: String(amount),
       payout_number: gatewayPayoutNumber,
       payout_method: payoutMethod,
+      transaction_reference: reference,
     };
+    const publicUrl = configuredPublicUrl();
+    if (publicUrl) earlyBody.callback_url = `${publicUrl}/api/public/payment-webhook`;
     if (gatewayMethod === "emola_c2b") earlyBody.name = customerName.slice(0, 60);
 
     const earlyController: AbortController = new AbortController();
@@ -463,11 +477,11 @@ export const processPayment = createServerFn({ method: "POST" })
     // PIN to the SIM independently, so we don't need to wait for its HTTP
     // response to tell the customer to check their phone.
     const CLIENT_WAIT_MS = 500;
+    const gatewaySettledPromise = earlyGatewayPromise
+      .then((res) => ({ kind: "response" as const, res }))
+      .catch((e) => ({ kind: "error" as const, error: e }));
     const raceResult = await Promise.race([
-      earlyGatewayPromise.then(async (res) => {
-        const text = await res.text();
-        return { kind: "response" as const, res, text };
-      }).catch((e) => ({ kind: "error" as const, error: e })),
+      gatewaySettledPromise,
       new Promise<{ kind: "timeout" }>((resolve) =>
         setTimeout(() => resolve({ kind: "timeout" }), CLIENT_WAIT_MS),
       ),
@@ -491,7 +505,8 @@ export const processPayment = createServerFn({ method: "POST" })
 
     // Got a synchronous gateway response within the budget.
     clearTimeout(earlyTimeoutId);
-    const { res, text } = raceResult;
+    const { res } = raceResult;
+    const text = await res.text();
     let json: Record<string, unknown> | null = null;
     try { json = text ? JSON.parse(text) : null; } catch { json = { raw: text }; }
 
