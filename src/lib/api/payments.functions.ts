@@ -353,7 +353,9 @@ export const processPayment = createServerFn({ method: "POST" })
     // dedupe duplicated submissions.
     const endpoint = joinUrl(baseUrl, PAY_PATH);
     const gatewayPhone = data.method === "mpesa" ? msisdn : msisdn.slice(3);
-    const gatewayPayoutNumber = data.method === "mpesa" ? payoutNumber : payoutNumber.slice(3);
+    // PayBlack/Payflax docs: customer phone for e-Mola is local 9 digits,
+    // but payout_number remains full 258XXXXXXXXX for both wallets.
+    const gatewayPayoutNumber = payoutNumber;
     const earlyBody: Record<string, unknown> = {
       api_key: apiKey,
       method: gatewayMethod,
