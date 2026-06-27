@@ -19,9 +19,31 @@ const PaymentSuccessInput = z.object({
   saleId: z.string().uuid(),
 });
 
+export type PaymentErrorCode =
+  | "invalid_phone"
+  | "method_mismatch"
+  | "insufficient_balance"
+  | "cancelled"
+  | "timeout"
+  | "duplicate"
+  | "gateway"
+  | "config"
+  | "internal";
+
 export type PaymentResult =
   | { success: true; saleId: string; transactionId: string | null }
-  | { success: false; error: string; saleId?: string };
+  | { success: false; error: string; code?: PaymentErrorCode; retryable?: boolean; saleId?: string };
+
+function classifyError(msg: string): { code: PaymentErrorCode; retryable: boolean } {
+  const s = (msg || "").toLowerCase();
+  if (/saldo|insufficient|insuf/.test(s)) return { code: "insufficient_balance", retryable: true };
+  if (/cancel/.test(s)) return { code: "cancelled", retryable: true };
+  if (/pin|timeout|tempo limite|n[aã]o confirmad|expir/.test(s)) return { code: "timeout", retryable: true };
+  if (/duplicate|duplicad/.test(s)) return { code: "duplicate", retryable: false };
+  if (/initiator|authentication|isdn|other process/.test(s)) return { code: "gateway", retryable: true };
+  return { code: "gateway", retryable: true };
+}
+
 
 export const getPaymentSuccessData = createServerFn({ method: "GET" })
   .inputValidator((input) => PaymentSuccessInput.parse(input))
