@@ -310,6 +310,14 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
                               href={buildWhatsAppLink(item)}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={() => {
+                                logAttempt({
+                                  data: {
+                                    productId: item.productLinkId && /^[0-9a-f-]{36}$/i.test(item.productLinkId) ? item.productLinkId : null,
+                                    customerPhone: item.customerPhone,
+                                  },
+                                }).then(() => refetchAttempts()).catch(() => {});
+                              }}
                             >
                               <MessageCircle className="h-4 w-4 mr-1.5" />
                               Recuperar Venda
