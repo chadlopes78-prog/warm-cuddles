@@ -683,6 +683,24 @@ async function dispatchApprovedSideEffects(
     inserted++;
   }
   if (inserted > 0) await processPendingForUser(userId);
+
+  // FALLBACK: se nenhum webhook Pushcut casou com este produto, dispara o
+  // Pushcut do perfil (canal legado) para garantir que o vendedor receba a
+  // notificação da venda. Dedupe por `profile:${saleId}` em pushcut_logs
+  // impede duplicação caso este caminho rode mais de uma vez.
+  if (inserted === 0 && triggerPushcut) {
+    try {
+      const { sendProfilePushcut } = await import("@/lib/pushcut/profile.server");
+      await sendProfilePushcut({
+        id: sale.id,
+        user_id: userId,
+        amount: sale.amount ?? null,
+        product_id: sale.product_id ?? null,
+      });
+    } catch (e) {
+      console.error("[pushcut][profile-fallback] error (suppressed)", e);
+    }
+  }
   // Silence unused warning for helper kept for non-approved flows.
   void enqueueWebhookEvent;
 
