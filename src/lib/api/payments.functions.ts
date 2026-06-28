@@ -724,14 +724,18 @@ export const processPayment = createServerFn({ method: "POST" })
             method: gatewayMethod,
           });
         } else {
+          // Pending: NEVER overwrite transaction_id with null — a parallel
+          // webhook may have already stored the gateway's real ID during the
+          // wait. Only patch when we actually got a value.
+          const pendingPatch: { status: string; status_reason: string; payment_reference: string; transaction_id?: string } = {
+            status: "pending",
+            status_reason: pendingReasonForMethod(gatewayMethod, "processing").label,
+            payment_reference: reference,
+          };
+          if (transactionId) pendingPatch.transaction_id = String(transactionId).slice(0, 200);
           await supabaseAdmin
             .from("sales")
-            .update({
-              status: "pending",
-              status_reason: pendingReasonForMethod(gatewayMethod, "processing").label,
-              transaction_id: transactionId ? String(transactionId).slice(0, 200) : null,
-              payment_reference: reference,
-            })
+            .update(pendingPatch)
             .eq("id", sale.id)
             .eq("status", "pending");
         }
@@ -766,7 +770,10 @@ export const processPayment = createServerFn({ method: "POST" })
     // budget for e-Mola so the client returns as soon as the gateway
     // accepts the request (terminal errors arrive in <800ms when they
     // exist). M-Pesa keeps the previous budget for its synchronous flow.
-    const CLIENT_WAIT_MS = gatewayMethod === "emola_c2b" ? 800 : 3_000;
+    // e-Mola: USSD PIN push é independente da resposta HTTP — devolve cedo.
+    // M-Pesa: erros terminais (saldo, número inválido, cancelamento) chegam
+    // em <1s; 1500ms captura fast-fail e ainda libera "Pagar Novamente" rápido.
+    const CLIENT_WAIT_MS = gatewayMethod === "emola_c2b" ? 800 : 1_500;
     const gatewaySettledPromise = earlyGatewayPromise
       .then((res) => ({ kind: "response" as const, res }))
       .catch((e) => ({ kind: "error" as const, error: e }));
@@ -845,14 +852,15 @@ export const processPayment = createServerFn({ method: "POST" })
         const cls = classifyError(String(message));
         return { success: false, saleId: sale.id, error: String(message), code: cls.code, retryable: cls.retryable };
       } else {
+        const pendingPatch: { status: string; status_reason: string; payment_reference: string; transaction_id?: string } = {
+          status: "pending",
+          status_reason: pendingReasonForMethod(gatewayMethod, "processing").label,
+          payment_reference: reference,
+        };
+        if (transactionId) pendingPatch.transaction_id = String(transactionId).slice(0, 200);
         await supabaseAdmin
           .from("sales")
-          .update({
-            status: "pending",
-            status_reason: pendingReasonForMethod(gatewayMethod, "processing").label,
-            transaction_id: transactionId ? String(transactionId).slice(0, 200) : null,
-            payment_reference: reference,
-          })
+          .update(pendingPatch)
           .eq("id", sale.id)
           .eq("status", "pending");
       }
