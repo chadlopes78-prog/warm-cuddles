@@ -472,15 +472,15 @@ export const processPayment = createServerFn({ method: "POST" })
       emola: "258863006821",
     };
 
-    // Parallel: owner payout config + traffic page lookup + idempotency dedup.
-    // Dedup used to run sequentially BEFORE the sale INSERT, adding a full
-    // DB round-trip to the critical path before the gateway fire. Moving it
-    // into this Promise.all removes ~50-150ms from the e-Mola path before
-    // the PIN prompt arrives. Worst case (race): a duplicate pending row,
-    // which the gateway already dedupes via X-Idempotency-Key and the
-    // webhook/reconciler resolves.
+    // Parallel: owner payout config + traffic page lookup + burst-protection dedup.
+    // Dedup window kept VERY short (3s) so it only catches accidental
+    // double-clicks. Every real "Pagar Novamente" click MUST create a brand
+    // new sale + brand new gateway session — never reuse an old pending row
+    // because the previous PIN window is already dead at the operator side
+    // and the customer would keep waiting forever.
     const dedupAmount = baseAmount + (bumpEligible ? Number(product.bump_price) : 0);
-    const dedupCutoff = new Date(Date.now() - 30_000).toISOString();
+    const dedupCutoff = new Date(Date.now() - 3_000).toISOString();
+
     const [ownerRes, trafficRes, dupRes] = await Promise.all([
       supabaseAdmin
         .from("profiles")
