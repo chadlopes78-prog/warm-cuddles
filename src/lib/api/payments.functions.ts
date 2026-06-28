@@ -727,7 +727,7 @@ export const processPayment = createServerFn({ method: "POST" })
           // Pending: NEVER overwrite transaction_id with null — a parallel
           // webhook may have already stored the gateway's real ID during the
           // wait. Only patch when we actually got a value.
-          const pendingPatch: Record<string, unknown> = {
+          const pendingPatch: { status: string; status_reason: string; payment_reference: string; transaction_id?: string } = {
             status: "pending",
             status_reason: pendingReasonForMethod(gatewayMethod, "processing").label,
             payment_reference: reference,
@@ -852,7 +852,7 @@ export const processPayment = createServerFn({ method: "POST" })
         const cls = classifyError(String(message));
         return { success: false, saleId: sale.id, error: String(message), code: cls.code, retryable: cls.retryable };
       } else {
-        const pendingPatch: Record<string, unknown> = {
+        const pendingPatch: { status: string; status_reason: string; payment_reference: string; transaction_id?: string } = {
           status: "pending",
           status_reason: pendingReasonForMethod(gatewayMethod, "processing").label,
           payment_reference: reference,
