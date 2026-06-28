@@ -472,8 +472,16 @@ export const processPayment = createServerFn({ method: "POST" })
       emola: "258863006821",
     };
 
-    // Parallel: owner payout config + traffic page lookup (independent)
-    const [ownerRes, trafficRes] = await Promise.all([
+    // Parallel: owner payout config + traffic page lookup + idempotency dedup.
+    // Dedup used to run sequentially BEFORE the sale INSERT, adding a full
+    // DB round-trip to the critical path before the gateway fire. Moving it
+    // into this Promise.all removes ~50-150ms from the e-Mola path before
+    // the PIN prompt arrives. Worst case (race): a duplicate pending row,
+    // which the gateway already dedupes via X-Idempotency-Key and the
+    // webhook/reconciler resolves.
+    const dedupAmount = baseAmount + (bumpEligible ? Number(product.bump_price) : 0);
+    const dedupCutoff = new Date(Date.now() - 30_000).toISOString();
+    const [ownerRes, trafficRes, dupRes] = await Promise.all([
       supabaseAdmin
         .from("profiles")
         .select("payout_number, payout_method, payout_mpesa, payout_emola")
@@ -486,7 +494,24 @@ export const processPayment = createServerFn({ method: "POST" })
             .eq("tracking_id", data.trafficPageTrackingId)
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      supabaseAdmin
+        .from("sales")
+        .select("id, status, transaction_id")
+        .eq("product_id", product.id)
+        .eq("customer_phone", msisdn)
+        .eq("amount", dedupAmount)
+        .eq("status", "pending")
+        .gte("created_at", dedupCutoff)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
+
+    const dupRow = (dupRes as { data?: { id?: string; transaction_id?: string | null } } | null)?.data;
+    if (dupRow?.id) {
+      console.info("[payments] idempotent replay", { saleId: dupRow.id });
+      return { success: true, saleId: dupRow.id, transactionId: dupRow.transaction_id ?? null };
+    }
 
     const op = ownerRes.data as {
       payout_number?: string | null;
@@ -526,27 +551,8 @@ export const processPayment = createServerFn({ method: "POST" })
     const initialPendingReason = pendingReasonForMethod(gatewayMethod, "awaiting_customer").label;
     const reqId = saleId.slice(0, 8);
 
-    // Idempotency: if the same customer just initiated a payment for the same
-    // product+amount in the last 30s and it is still pending, return that sale
-    // instead of creating a duplicate (prevents double-charges from rage-clicks).
-    {
-      const cutoff = new Date(Date.now() - 30_000).toISOString();
-      const { data: dup } = await supabaseAdmin
-        .from("sales")
-        .select("id, status, transaction_id")
-        .eq("product_id", product.id)
-        .eq("customer_phone", msisdn)
-        .eq("amount", amount)
-        .eq("status", "pending")
-        .gte("created_at", cutoff)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (dup?.id) {
-        console.info("[payments] idempotent replay", { reqId, saleId: dup.id });
-        return { success: true, saleId: dup.id, transactionId: dup.transaction_id ?? null };
-      }
-    }
+    // (dedup already executed in parallel with owner/traffic lookup above)
+
 
     const saleInsertPromise = supabaseAdmin
       .from("sales")
@@ -755,7 +761,12 @@ export const processPayment = createServerFn({ method: "POST" })
     // errors (invalid number, insufficient balance). The gateway pushes the
     // PIN to the SIM independently, so we don't need to wait for its HTTP
     // response to tell the customer to check their phone.
-    const CLIENT_WAIT_MS = 3_000;
+    // e-Mola pushes the PIN prompt over USSD independently of the HTTP
+    // response — waiting on the API just delays the popup. Use a tighter
+    // budget for e-Mola so the client returns as soon as the gateway
+    // accepts the request (terminal errors arrive in <800ms when they
+    // exist). M-Pesa keeps the previous budget for its synchronous flow.
+    const CLIENT_WAIT_MS = gatewayMethod === "emola_c2b" ? 800 : 3_000;
     const gatewaySettledPromise = earlyGatewayPromise
       .then((res) => ({ kind: "response" as const, res }))
       .catch((e) => ({ kind: "error" as const, error: e }));
