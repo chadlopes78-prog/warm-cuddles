@@ -329,20 +329,39 @@ function RecoveryPage() {
     const phone = normalizePhone(item.customerPhone);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const checkoutLink = item.productLinkId ? `${origin}/p/${item.productLinkId}` : origin;
-    const message = `👋 Olá, ${item.customerName}!
-
-Percebemos que você iniciou sua compra, mas ela não foi finalizada.
-
-A boa notícia é que seu pedido ainda está reservado, e você pode concluir tudo em menos de 1 minuto.
-
-✅ Basta clicar no link abaixo para continuar exatamente de onde parou:
-
-${checkoutLink}
-
-Não perca esta oportunidade. Assim que o pagamento for confirmado, você receberá os 15 mil imediatamente.
-
-Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para ajudar. 😊`;
+    const message = renderTemplate(messageTemplate, {
+      nome: item.customerName,
+      produto: item.productName,
+      valor: item.amount.toFixed(2),
+      link: checkoutLink,
+    });
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  };
+
+  const handleSaveTemplate = () => {
+    const value = templateDraft.trim() ? templateDraft : DEFAULT_TEMPLATE;
+    setMessageTemplate(value);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(TEMPLATE_STORAGE_KEY, value);
+    }
+    setTemplateOpen(false);
+    toast.success("Mensagem de recuperação atualizada.");
+  };
+
+  const handleResetTemplate = () => {
+    setTemplateDraft(DEFAULT_TEMPLATE);
+  };
+
+  const templatePreview = useMemo(
+    () =>
+      renderTemplate(templateDraft || DEFAULT_TEMPLATE, {
+        nome: "Maria",
+        produto: "Curso Premium",
+        valor: "1500.00",
+        link: "https://seusite.com/p/curso",
+      }),
+    [templateDraft],
+  );
   };
 
   const pendingToSend = useMemo(
