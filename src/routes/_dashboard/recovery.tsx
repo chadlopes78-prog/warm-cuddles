@@ -362,7 +362,6 @@ function RecoveryPage() {
       }),
     [templateDraft],
   );
-  };
 
   const pendingToSend = useMemo(
     () => periodItems.filter((i) => i.status === "pending" && !i.contactSent),
