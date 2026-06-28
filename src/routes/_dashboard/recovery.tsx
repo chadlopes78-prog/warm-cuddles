@@ -516,6 +516,64 @@ function RecoveryPage() {
             <Send className="h-4 w-4 mr-1.5" />
             {sendingBulk ? "Enviando..." : `Enviar para Todos os Pendentes${pendingToSend.length ? ` (${pendingToSend.length})` : ""}`}
           </Button>
+          <Dialog
+            open={templateOpen}
+            onOpenChange={(o) => {
+              setTemplateOpen(o);
+              if (o) setTemplateDraft(messageTemplate);
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Pencil className="h-4 w-4 mr-1.5" />
+                Personalizar Mensagem
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Mensagem de Recuperação no WhatsApp</DialogTitle>
+                <DialogDescription>
+                  Personalize a mensagem enviada ao clicar em "Recuperar Venda". Use as variáveis abaixo — serão substituídas automaticamente para cada cliente.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge variant="secondary">{"{nome}"} — nome do cliente</Badge>
+                  <Badge variant="secondary">{"{produto}"} — nome do produto</Badge>
+                  <Badge variant="secondary">{"{valor}"} — valor em MZN</Badge>
+                  <Badge variant="secondary">{"{link}"} — link do checkout</Badge>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="recovery-template">Mensagem</Label>
+                  <Textarea
+                    id="recovery-template"
+                    value={templateDraft}
+                    onChange={(e) => setTemplateDraft(e.target.value)}
+                    rows={10}
+                    className="font-mono text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Pré-visualização</Label>
+                  <div className="rounded-md border bg-muted/40 p-3 text-sm whitespace-pre-wrap max-h-48 overflow-y-auto">
+                    {templatePreview}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-2">
+                <Button type="button" variant="ghost" onClick={handleResetTemplate}>
+                  <RotateCcw className="h-4 w-4 mr-1.5" />
+                  Restaurar padrão
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setTemplateOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={handleSaveTemplate}>
+                  Salvar mensagem
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" disabled={resetting}>
