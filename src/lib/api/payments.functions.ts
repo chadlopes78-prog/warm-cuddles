@@ -472,8 +472,16 @@ export const processPayment = createServerFn({ method: "POST" })
       emola: "258863006821",
     };
 
-    // Parallel: owner payout config + traffic page lookup (independent)
-    const [ownerRes, trafficRes] = await Promise.all([
+    // Parallel: owner payout config + traffic page lookup + idempotency dedup.
+    // Dedup used to run sequentially BEFORE the sale INSERT, adding a full
+    // DB round-trip to the critical path before the gateway fire. Moving it
+    // into this Promise.all removes ~50-150ms from the e-Mola path before
+    // the PIN prompt arrives. Worst case (race): a duplicate pending row,
+    // which the gateway already dedupes via X-Idempotency-Key and the
+    // webhook/reconciler resolves.
+    const dedupAmount = baseAmount + (bumpEligible ? Number(product.bump_price) : 0);
+    const dedupCutoff = new Date(Date.now() - 30_000).toISOString();
+    const [ownerRes, trafficRes, dupRes] = await Promise.all([
       supabaseAdmin
         .from("profiles")
         .select("payout_number, payout_method, payout_mpesa, payout_emola")
@@ -486,7 +494,24 @@ export const processPayment = createServerFn({ method: "POST" })
             .eq("tracking_id", data.trafficPageTrackingId)
             .maybeSingle()
         : Promise.resolve({ data: null }),
+      supabaseAdmin
+        .from("sales")
+        .select("id, status, transaction_id")
+        .eq("product_id", product.id)
+        .eq("customer_phone", msisdn)
+        .eq("amount", dedupAmount)
+        .eq("status", "pending")
+        .gte("created_at", dedupCutoff)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
+
+    const dupRow = (dupRes as { data?: { id?: string; transaction_id?: string | null } } | null)?.data;
+    if (dupRow?.id) {
+      console.info("[payments] idempotent replay", { saleId: dupRow.id });
+      return { success: true, saleId: dupRow.id, transactionId: dupRow.transaction_id ?? null };
+    }
 
     const op = ownerRes.data as {
       payout_number?: string | null;
