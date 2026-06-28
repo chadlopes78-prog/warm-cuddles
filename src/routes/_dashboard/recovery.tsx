@@ -131,12 +131,20 @@ function RecoveryPage() {
   const [resetAt, setResetAt] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
   const [sendingBulk, setSendingBulk] = useState(false);
+  const [messageTemplate, setMessageTemplate] = useState<string>(DEFAULT_TEMPLATE);
+  const [templateDraft, setTemplateDraft] = useState<string>(DEFAULT_TEMPLATE);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const logAttempt = useServerFn(logRecoveryAttempt);
   const resetHistory = useServerFn(resetRecoveryHistory);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setResetAt(window.localStorage.getItem(RESET_STORAGE_KEY));
+      const saved = window.localStorage.getItem(TEMPLATE_STORAGE_KEY);
+      if (saved && saved.trim()) {
+        setMessageTemplate(saved);
+        setTemplateDraft(saved);
+      }
     }
   }, []);
 
