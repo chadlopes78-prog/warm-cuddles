@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { MessageSquare, MessageCircle, CheckCircle2, Clock, TrendingUp, Search, Trash2, Send } from "lucide-react";
+import { MessageSquare, MessageCircle, CheckCircle2, Clock, TrendingUp, Search, Trash2, Send, Pencil, RotateCcw } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -36,11 +39,37 @@ export const Route = createFileRoute("/_dashboard/recovery")({
 });
 
 const RESET_STORAGE_KEY = "recovery:reset_at";
+const TEMPLATE_STORAGE_KEY = "recovery:message_template";
 type Period = "today" | "7d" | "30d" | "custom";
 
 const SUCCESS_STATUSES = ["approved", "paid", "success"];
 const ABANDONED_WINDOW_DAYS = 30;
 const EXPIRE_AFTER_HOURS = 24;
+
+const DEFAULT_TEMPLATE = `👋 Olá, {nome}!
+
+Percebemos que você iniciou sua compra do produto *{produto}*, mas ela não foi finalizada.
+
+A boa notícia é que seu pedido ainda está reservado, e você pode concluir tudo em menos de 1 minuto.
+
+✅ Basta clicar no link abaixo para continuar exatamente de onde parou:
+
+{link}
+
+Valor: {valor} MZN
+
+Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para ajudar. 😊`;
+
+function renderTemplate(
+  template: string,
+  vars: { nome: string; produto: string; valor: string; link: string },
+) {
+  return template
+    .replace(/\{nome\}/gi, vars.nome)
+    .replace(/\{produto\}/gi, vars.produto)
+    .replace(/\{valor\}/gi, vars.valor)
+    .replace(/\{link\}/gi, vars.link);
+}
 
 type SaleRow = {
   id: string;
@@ -102,12 +131,20 @@ function RecoveryPage() {
   const [resetAt, setResetAt] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
   const [sendingBulk, setSendingBulk] = useState(false);
+  const [messageTemplate, setMessageTemplate] = useState<string>(DEFAULT_TEMPLATE);
+  const [templateDraft, setTemplateDraft] = useState<string>(DEFAULT_TEMPLATE);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const logAttempt = useServerFn(logRecoveryAttempt);
   const resetHistory = useServerFn(resetRecoveryHistory);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setResetAt(window.localStorage.getItem(RESET_STORAGE_KEY));
+      const saved = window.localStorage.getItem(TEMPLATE_STORAGE_KEY);
+      if (saved && saved.trim()) {
+        setMessageTemplate(saved);
+        setTemplateDraft(saved);
+      }
     }
   }, []);
 
@@ -292,21 +329,39 @@ function RecoveryPage() {
     const phone = normalizePhone(item.customerPhone);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const checkoutLink = item.productLinkId ? `${origin}/p/${item.productLinkId}` : origin;
-    const message = `👋 Olá, ${item.customerName}!
-
-Percebemos que você iniciou sua compra, mas ela não foi finalizada.
-
-A boa notícia é que seu pedido ainda está reservado, e você pode concluir tudo em menos de 1 minuto.
-
-✅ Basta clicar no link abaixo para continuar exatamente de onde parou:
-
-${checkoutLink}
-
-Não perca esta oportunidade. Assim que o pagamento for confirmado, você receberá os 15 mil imediatamente.
-
-Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para ajudar. 😊`;
+    const message = renderTemplate(messageTemplate, {
+      nome: item.customerName,
+      produto: item.productName,
+      valor: item.amount.toFixed(2),
+      link: checkoutLink,
+    });
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
   };
+
+  const handleSaveTemplate = () => {
+    const value = templateDraft.trim() ? templateDraft : DEFAULT_TEMPLATE;
+    setMessageTemplate(value);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(TEMPLATE_STORAGE_KEY, value);
+    }
+    setTemplateOpen(false);
+    toast.success("Mensagem de recuperação atualizada.");
+  };
+
+  const handleResetTemplate = () => {
+    setTemplateDraft(DEFAULT_TEMPLATE);
+  };
+
+  const templatePreview = useMemo(
+    () =>
+      renderTemplate(templateDraft || DEFAULT_TEMPLATE, {
+        nome: "Maria",
+        produto: "Curso Premium",
+        valor: "1500.00",
+        link: "https://seusite.com/p/curso",
+      }),
+    [templateDraft],
+  );
 
   const pendingToSend = useMemo(
     () => periodItems.filter((i) => i.status === "pending" && !i.contactSent),
@@ -461,6 +516,64 @@ Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para a
             <Send className="h-4 w-4 mr-1.5" />
             {sendingBulk ? "Enviando..." : `Enviar para Todos os Pendentes${pendingToSend.length ? ` (${pendingToSend.length})` : ""}`}
           </Button>
+          <Dialog
+            open={templateOpen}
+            onOpenChange={(o) => {
+              setTemplateOpen(o);
+              if (o) setTemplateDraft(messageTemplate);
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Pencil className="h-4 w-4 mr-1.5" />
+                Personalizar Mensagem
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Mensagem de Recuperação no WhatsApp</DialogTitle>
+                <DialogDescription>
+                  Personalize a mensagem enviada ao clicar em "Recuperar Venda". Use as variáveis abaixo — serão substituídas automaticamente para cada cliente.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Badge variant="secondary">{"{nome}"} — nome do cliente</Badge>
+                  <Badge variant="secondary">{"{produto}"} — nome do produto</Badge>
+                  <Badge variant="secondary">{"{valor}"} — valor em MZN</Badge>
+                  <Badge variant="secondary">{"{link}"} — link do checkout</Badge>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="recovery-template">Mensagem</Label>
+                  <Textarea
+                    id="recovery-template"
+                    value={templateDraft}
+                    onChange={(e) => setTemplateDraft(e.target.value)}
+                    rows={10}
+                    className="font-mono text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Pré-visualização</Label>
+                  <div className="rounded-md border bg-muted/40 p-3 text-sm whitespace-pre-wrap max-h-48 overflow-y-auto">
+                    {templatePreview}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter className="gap-2 sm:gap-2">
+                <Button type="button" variant="ghost" onClick={handleResetTemplate}>
+                  <RotateCcw className="h-4 w-4 mr-1.5" />
+                  Restaurar padrão
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setTemplateOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="button" onClick={handleSaveTemplate}>
+                  Salvar mensagem
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" disabled={resetting}>
