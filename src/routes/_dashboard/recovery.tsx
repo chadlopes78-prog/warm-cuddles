@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { MessageSquare, MessageCircle, CheckCircle2, Clock, TrendingUp, Search, Trash2, Send } from "lucide-react";
+import { MessageSquare, MessageCircle, CheckCircle2, Clock, TrendingUp, Search, Trash2, Send, Pencil, RotateCcw } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
