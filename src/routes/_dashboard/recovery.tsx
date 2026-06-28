@@ -39,11 +39,37 @@ export const Route = createFileRoute("/_dashboard/recovery")({
 });
 
 const RESET_STORAGE_KEY = "recovery:reset_at";
+const TEMPLATE_STORAGE_KEY = "recovery:message_template";
 type Period = "today" | "7d" | "30d" | "custom";
 
 const SUCCESS_STATUSES = ["approved", "paid", "success"];
 const ABANDONED_WINDOW_DAYS = 30;
 const EXPIRE_AFTER_HOURS = 24;
+
+const DEFAULT_TEMPLATE = `👋 Olá, {nome}!
+
+Percebemos que você iniciou sua compra do produto *{produto}*, mas ela não foi finalizada.
+
+A boa notícia é que seu pedido ainda está reservado, e você pode concluir tudo em menos de 1 minuto.
+
+✅ Basta clicar no link abaixo para continuar exatamente de onde parou:
+
+{link}
+
+Valor: {valor} MZN
+
+Se tiver qualquer dúvida, basta responder esta mensagem. Estamos prontos para ajudar. 😊`;
+
+function renderTemplate(
+  template: string,
+  vars: { nome: string; produto: string; valor: string; link: string },
+) {
+  return template
+    .replace(/\{nome\}/gi, vars.nome)
+    .replace(/\{produto\}/gi, vars.produto)
+    .replace(/\{valor\}/gi, vars.valor)
+    .replace(/\{link\}/gi, vars.link);
+}
 
 type SaleRow = {
   id: string;
