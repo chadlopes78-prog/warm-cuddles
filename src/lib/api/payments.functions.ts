@@ -761,7 +761,12 @@ export const processPayment = createServerFn({ method: "POST" })
     // errors (invalid number, insufficient balance). The gateway pushes the
     // PIN to the SIM independently, so we don't need to wait for its HTTP
     // response to tell the customer to check their phone.
-    const CLIENT_WAIT_MS = 3_000;
+    // e-Mola pushes the PIN prompt over USSD independently of the HTTP
+    // response — waiting on the API just delays the popup. Use a tighter
+    // budget for e-Mola so the client returns as soon as the gateway
+    // accepts the request (terminal errors arrive in <800ms when they
+    // exist). M-Pesa keeps the previous budget for its synchronous flow.
+    const CLIENT_WAIT_MS = gatewayMethod === "emola_c2b" ? 800 : 3_000;
     const gatewaySettledPromise = earlyGatewayPromise
       .then((res) => ({ kind: "response" as const, res }))
       .catch((e) => ({ kind: "error" as const, error: e }));
