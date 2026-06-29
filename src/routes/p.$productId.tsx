@@ -707,6 +707,41 @@ function CheckoutPage() {
           </form>
         </div>
       </div>
+
+      <Dialog open={failureModalOpen} onOpenChange={setFailureModalOpen}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <div className="mx-auto h-14 w-14 rounded-full bg-red-50 flex items-center justify-center mb-2">
+              <XCircle className="h-8 w-8 text-red-600" />
+            </div>
+            <DialogTitle className="text-center text-lg font-bold text-slate-900">
+              Pagamento não concluído
+            </DialogTitle>
+            <DialogDescription className="text-center text-sm text-slate-600 pt-1">
+              Não foi possível concluir o seu pagamento. Tente novamente agora para garantir a sua oferta exclusiva antes que expire.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-col">
+            <Button
+              onClick={retryPayment}
+              disabled={processingPayment}
+              className="w-full h-12 rounded-xl font-bold text-white"
+              style={{
+                background: `linear-gradient(180deg, ${accent} 0%, ${paymentMethod === "mpesa" ? "#B30410" : "#EA580C"} 100%)`,
+              }}
+            >
+              {processingPayment ? "A enviar..." : "Tentar Novamente"}
+            </Button>
+            <button
+              type="button"
+              onClick={() => setFailureModalOpen(false)}
+              className="w-full text-xs font-semibold text-slate-500 hover:text-slate-700 py-1"
+            >
+              Fechar
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
