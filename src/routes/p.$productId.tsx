@@ -211,9 +211,10 @@ function CheckoutPage() {
               r?.sale?.status_reason ||
                 "Pagamento não confirmado. Tente novamente ou escolha outro método.",
             );
-            setPaymentErrorCode("gateway");
+            setPaymentErrorCode(status === "cancelled" || status === "canceled" ? "cancelled" : "gateway");
             setPaymentRetryable(true);
             setPendingSaleId(null);
+            setFailureModalOpen(true);
             return;
           }
         } catch (e) {
@@ -228,6 +229,7 @@ function CheckoutPage() {
         setPaymentErrorCode("timeout");
         setPaymentRetryable(true);
         setPendingSaleId(null);
+        setFailureModalOpen(true);
       }
     })();
     return () => { cancelled = true; };
