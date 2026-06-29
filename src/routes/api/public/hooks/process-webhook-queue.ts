@@ -4,7 +4,20 @@ import { createFileRoute } from "@tanstack/react-router";
 export const Route = createFileRoute("/api/public/hooks/process-webhook-queue")({
   server: {
     handlers: {
-      POST: async () => {
+      POST: async ({ request }) => {
+        const provided =
+          request.headers.get("x-cron-secret") ??
+          request.headers.get("apikey") ??
+          request.headers.get("x-api-key") ??
+          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+          null;
+        const expected = process.env.CRON_SECRET;
+        if (!expected || !provided || provided !== expected) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { deliverOnce } = await import("@/lib/webhooks/dispatcher.server");
 

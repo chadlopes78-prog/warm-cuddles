@@ -4,8 +4,14 @@ export const Route = createFileRoute("/api/public/hooks/daily-payment-summary")(
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apiKey = request.headers.get("apikey") ?? request.headers.get("x-api-key");
-        if (!apiKey || apiKey !== process.env.SUPABASE_PUBLISHABLE_KEY) {
+        const provided =
+          request.headers.get("x-cron-secret") ??
+          request.headers.get("apikey") ??
+          request.headers.get("x-api-key") ??
+          request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+          null;
+        const expected = process.env.CRON_SECRET;
+        if (!expected || !provided || provided !== expected) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },

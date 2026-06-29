@@ -20,8 +20,15 @@ serve(async (req) => {
 
     const { trackingId, eventType, url, referrer, metadata, campaignId, adId, source, medium } = await req.json()
 
+    const ALLOWED_EVENTS = ['view', 'click', 'purchase']
     if (!trackingId || !eventType) {
       return new Response(JSON.stringify({ error: 'Missing parameters' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+    if (!ALLOWED_EVENTS.includes(eventType)) {
+      return new Response(JSON.stringify({ error: 'Invalid event type' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       })

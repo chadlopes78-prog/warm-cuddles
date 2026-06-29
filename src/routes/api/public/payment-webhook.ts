@@ -35,11 +35,14 @@ async function handlePaymentWebhook(request: Request) {
     return new Response("Invalid JSON", { status: 400 });
   }
 
-  // Optional shared-secret verification. Some gateways support headers,
-  // others only echo the callback URL query string; accept both without
-  // making the public webhook unusable when a secret is configured.
+  // Shared-secret verification is MANDATORY. If PAYMENT_WEBHOOK_SECRET is not
+  // configured, refuse to process callbacks rather than accepting forged ones.
   const expectedSecret = process.env.PAYMENT_WEBHOOK_SECRET;
-  if (expectedSecret) {
+  if (!expectedSecret) {
+    console.error("[payment-webhook] PAYMENT_WEBHOOK_SECRET is not configured");
+    return new Response("Webhook secret not configured", { status: 500 });
+  }
+  {
     const url = new URL(request.url);
     const sent =
       request.headers.get("x-webhook-secret") ||
