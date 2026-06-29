@@ -144,7 +144,7 @@ function CheckoutPage() {
     if (!pendingSaleId) return;
     let cancelled = false;
     let attempts = 0;
-    const MAX = 80;
+    const MAX = 180;
     const TERMINAL_OK = ["paid", "approved", "success", "completed"];
     const TERMINAL_FAIL = ["failed", "expired", "cancelled", "canceled"];
     (async () => {
