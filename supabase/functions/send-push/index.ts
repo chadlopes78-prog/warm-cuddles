@@ -24,6 +24,31 @@ serve(async (req) => {
       throw new Error("user_id is required");
     }
 
+    // AuthZ: accept either (a) an internal service call carrying the
+    // SUPABASE_SERVICE_ROLE_KEY (used by trusted server paths), or
+    // (b) a logged-in user invoking the function for THEIR OWN user_id.
+    // Anonymous callers targeting arbitrary users are rejected.
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const bearer = authHeader.replace(/^Bearer\s+/i, "");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const isService = bearer.length > 0 && bearer === serviceKey;
+
+    if (!isService) {
+      const { data: userData, error: userErr } = await supabaseClient.auth.getUser(bearer);
+      if (userErr || !userData?.user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (userData.user.id !== user_id) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const publicKey = Deno.env.get("VAPID_PUBLIC_KEY");
     const privateKey = Deno.env.get("VAPID_PRIVATE_KEY");
     const subject = Deno.env.get("VAPID_SUBJECT") || "https://paymentblack.com";

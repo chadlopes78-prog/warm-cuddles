@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 const DEFAULT_BASE_URL = "https://payflax.site";
-const DEFAULT_API_KEY = "9e8848ec81379997bd3ff22dba132474593252a5d3d588d9ab9b2d1706f42faf";
 const PAY_PATH = "/api/pay";
 
 const PaymentInput = z.object({
@@ -186,7 +185,7 @@ async function fetchGatewayJson(url: string, headers: HeadersInit, timeoutMs: nu
 }
 
 async function reconcileCheckoutSaleWithGateway(sale: CheckoutSaleRow) {
-  const apiKey = process.env.PAYMENT_API_KEY || DEFAULT_API_KEY;
+  const apiKey = process.env.PAYMENT_API_KEY;
   const localStatus = String(sale.status ?? "").toLowerCase();
   const localReason = String(sale.status_reason ?? "").toLowerCase();
   const recoverableTimeoutFailure =
@@ -402,7 +401,7 @@ export const processPayment = createServerFn({ method: "POST" })
       return { success: false, code: "method_mismatch", retryable: true, error: "Para e-Mola use um número 86 ou 87." };
     }
 
-    const apiKey = process.env.PAYMENT_API_KEY || DEFAULT_API_KEY;
+    const apiKey = process.env.PAYMENT_API_KEY;
     const baseUrl = process.env.PAYMENT_API_BASE_URL || DEFAULT_BASE_URL;
 
     if (!apiKey) {
