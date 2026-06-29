@@ -185,13 +185,15 @@ async function fetchGatewayJson(url: string, headers: HeadersInit, timeoutMs: nu
 }
 
 async function reconcileCheckoutSaleWithGateway(sale: CheckoutSaleRow) {
-  const gatewayConfig = await import("@/lib/config.server").then((m) => m.getPaymentGatewayConfig());
-  const apiKey = gatewayConfig?.apiKey;
   const localStatus = String(sale.status ?? "").toLowerCase();
   const localReason = String(sale.status_reason ?? "").toLowerCase();
   const recoverableTimeoutFailure =
     localStatus === "failed" && /(tempo limite|timeout|não confirmado|nao confirmado|aguardando|process)/i.test(localReason);
-  if (!apiKey || (localStatus !== "pending" && !recoverableTimeoutFailure)) return null;
+  if (localStatus !== "pending" && !recoverableTimeoutFailure) return null;
+
+  const gatewayConfig = await import("@/lib/config.server").then((m) => m.getPaymentGatewayConfig());
+  const apiKey = gatewayConfig?.apiKey;
+  if (!apiKey) return null;
 
   const ageMs = sale.created_at ? Date.now() - new Date(sale.created_at).getTime() : 0;
   // Start reconciliation almost immediately after the first checkout poll.
