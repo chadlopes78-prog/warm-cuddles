@@ -15,7 +15,16 @@ import {
   Package,
   Clock,
   ArrowRight,
+  XCircle,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import mozFlag from "@/assets/moz-flag.png.asset.json";
