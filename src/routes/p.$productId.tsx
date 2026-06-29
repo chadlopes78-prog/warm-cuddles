@@ -364,6 +364,7 @@ function CheckoutPage() {
         setPaymentStatusMessage(null);
         toast.error(result.error || "Pagamento recusado.");
         setProcessingPayment(false);
+        setFailureModalOpen(true);
         return;
       }
 
@@ -383,7 +384,16 @@ function CheckoutPage() {
       setPaymentStatusMessage(null);
       toast.error("Erro ao processar pagamento: " + error.message);
       setProcessingPayment(false);
+      setFailureModalOpen(true);
     }
+  };
+
+  const retryPayment = () => {
+    setFailureModalOpen(false);
+    setPaymentErrorMessage(null);
+    setPaymentErrorCode(null);
+    setPaymentStatusMessage(null);
+    void submitPayment();
   };
 
   const handlePayment = (e: React.FormEvent) => {
