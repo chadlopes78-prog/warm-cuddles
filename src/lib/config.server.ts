@@ -24,3 +24,80 @@ export function getServerConfig() {
     //   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
   };
 }
+
+export type PaymentGatewayConfig = {
+  apiKey: string;
+  baseUrl: string;
+};
+
+const PAYMENT_GATEWAY_KEYS = [
+  "PAYMENT_API_KEY",
+  "payment_api_key",
+  "payflax_api_key",
+  "PAYFLAX_API_KEY",
+] as const;
+
+const PAYMENT_GATEWAY_BASE_URL_KEYS = [
+  "PAYMENT_API_BASE_URL",
+  "payment_api_base_url",
+  "payflax_base_url",
+  "PAYFLAX_BASE_URL",
+] as const;
+
+function cleanConfigValue(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizePaymentGatewayBaseUrl(value: string) {
+  const baseUrl = cleanConfigValue(value) || "https://payflax.site";
+  return baseUrl.replace(/\/+$/, "").replace(/\/api\/pay$/i, "");
+}
+
+function pickFirstConfigValue(
+  rows: Array<{ key: string; value: string | null }>,
+  keys: readonly string[],
+) {
+  const wanted = new Set(keys.map((key) => key.toLowerCase()));
+  const row = rows.find((item) => wanted.has(String(item.key).toLowerCase()) && cleanConfigValue(item.value));
+  return cleanConfigValue(row?.value);
+}
+
+async function readPaymentGatewayConfigFromDatabase(): Promise<Partial<PaymentGatewayConfig>> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const keys = [...PAYMENT_GATEWAY_KEYS, ...PAYMENT_GATEWAY_BASE_URL_KEYS];
+    const { data, error } = await supabaseAdmin
+      .from("app_config")
+      .select("key,value")
+      .in("key", keys as unknown as string[]);
+
+    if (error) {
+      console.error("[payments] app_config gateway lookup failed", error.message);
+      return {};
+    }
+
+    const rows = (data ?? []) as Array<{ key: string; value: string | null }>;
+    return {
+      apiKey: pickFirstConfigValue(rows, PAYMENT_GATEWAY_KEYS),
+      baseUrl: pickFirstConfigValue(rows, PAYMENT_GATEWAY_BASE_URL_KEYS),
+    };
+  } catch (error) {
+    console.error("[payments] app_config gateway lookup crashed", error);
+    return {};
+  }
+}
+
+export async function getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | null> {
+  const envApiKey = cleanConfigValue(process.env.PAYMENT_API_KEY);
+  const envBaseUrl = cleanConfigValue(process.env.PAYMENT_API_BASE_URL);
+  if (envApiKey) {
+    return { apiKey: envApiKey, baseUrl: normalizePaymentGatewayBaseUrl(envBaseUrl) };
+  }
+
+  const dbConfig = await readPaymentGatewayConfigFromDatabase();
+  if (dbConfig.apiKey) {
+    return { apiKey: dbConfig.apiKey, baseUrl: normalizePaymentGatewayBaseUrl(dbConfig.baseUrl || "") };
+  }
+
+  return null;
+}

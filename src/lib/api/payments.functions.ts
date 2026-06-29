@@ -185,12 +185,15 @@ async function fetchGatewayJson(url: string, headers: HeadersInit, timeoutMs: nu
 }
 
 async function reconcileCheckoutSaleWithGateway(sale: CheckoutSaleRow) {
-  const apiKey = process.env.PAYMENT_API_KEY;
   const localStatus = String(sale.status ?? "").toLowerCase();
   const localReason = String(sale.status_reason ?? "").toLowerCase();
   const recoverableTimeoutFailure =
     localStatus === "failed" && /(tempo limite|timeout|não confirmado|nao confirmado|aguardando|process)/i.test(localReason);
-  if (!apiKey || (localStatus !== "pending" && !recoverableTimeoutFailure)) return null;
+  if (localStatus !== "pending" && !recoverableTimeoutFailure) return null;
+
+  const gatewayConfig = await import("@/lib/config.server").then((m) => m.getPaymentGatewayConfig());
+  const apiKey = gatewayConfig?.apiKey;
+  if (!apiKey) return null;
 
   const ageMs = sale.created_at ? Date.now() - new Date(sale.created_at).getTime() : 0;
   // Start reconciliation almost immediately after the first checkout poll.
@@ -198,7 +201,7 @@ async function reconcileCheckoutSaleWithGateway(sale: CheckoutSaleRow) {
   // phone but the webhook/background response has not updated the sale yet.
   if (ageMs < 900) return null;
 
-  const baseUrl = process.env.PAYMENT_API_BASE_URL || DEFAULT_BASE_URL;
+  const baseUrl = gatewayConfig?.baseUrl || DEFAULT_BASE_URL;
   const headers = { Accept: "application/json", "X-API-Key": apiKey };
   const {
     confirmSalePayment,
@@ -401,10 +404,12 @@ export const processPayment = createServerFn({ method: "POST" })
       return { success: false, code: "method_mismatch", retryable: true, error: "Para e-Mola use um número 86 ou 87." };
     }
 
-    const apiKey = process.env.PAYMENT_API_KEY;
-    const baseUrl = process.env.PAYMENT_API_BASE_URL || DEFAULT_BASE_URL;
+    const gatewayConfig = await import("@/lib/config.server").then((m) => m.getPaymentGatewayConfig());
+    const apiKey = gatewayConfig?.apiKey;
+    const baseUrl = gatewayConfig?.baseUrl || DEFAULT_BASE_URL;
 
     if (!apiKey) {
+      console.error("[payments] PAYMENT_API_KEY is missing at runtime and app_config has no payment_api_key fallback");
       return { success: false, code: "config", retryable: false, error: "Gateway de pagamento não configurado no servidor." };
     }
 

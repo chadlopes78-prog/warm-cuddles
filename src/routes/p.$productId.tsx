@@ -47,7 +47,7 @@ export const Route = createFileRoute("/p/$productId")({
     const baseLinks = [
       // Warm TCP+TLS to the payment gateway BEFORE the user clicks "Pagar".
       // Removes ~150–400 ms of handshake from the critical path on first click.
-      { rel: "preconnect", href: "https://payflax.site", crossOrigin: "anonymous" as const },
+      { rel: "preconnect", href: "https://payflax.site" },
       { rel: "dns-prefetch", href: "https://payflax.site" },
     ];
 
