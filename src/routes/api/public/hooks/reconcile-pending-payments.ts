@@ -44,8 +44,9 @@ export const Route = createFileRoute("/api/public/hooks/reconcile-pending-paymen
         const url = new URL(request.url);
         const olderThanMinutes = Math.max(
           2,
-          Math.min(60, Number(url.searchParams.get("minutes") ?? "8")),
+          Math.min(60, Number(url.searchParams.get("minutes") ?? "3")),
         );
+
         const cutoff = new Date(Date.now() - olderThanMinutes * 60_000).toISOString();
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
