@@ -158,9 +158,10 @@ function RootComponent() {
           .then((registration) => {
             console.log("[SW] Registrado com sucesso:", registration.scope);
             
-            // Try to auto-subscribe if permission is already granted
-            if (Notification.permission === "granted") {
-              subscribeToPushNotifications(true);
+            // Try to auto-subscribe if permission is already granted.
+            // Guard: Safari iOS (non-PWA) e WebViews antigos não expõem `Notification`.
+            if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+              subscribeToPushNotifications(true).catch(() => {});
             }
           })
           .catch((err) => {
