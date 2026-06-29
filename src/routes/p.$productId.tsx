@@ -120,6 +120,7 @@ function CheckoutPage() {
   const [paymentRetryable, setPaymentRetryable] = useState(false);
   const [pendingSaleId, setPendingSaleId] = useState<string | null>(null);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [failureModalOpen, setFailureModalOpen] = useState(false);
   const pollFn = useServerFn(getPaymentSuccessData);
 
 
