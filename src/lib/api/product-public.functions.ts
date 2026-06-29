@@ -1,10 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import type { Database } from "@/integrations/supabase/types";
 
 const PUBLIC_PRODUCT_COLUMNS =
-  "id, user_id, name, description, price, image_url, checkout_banner_url, category, status, custom_url, warranty_days, delivery_type, facebook_pixel_id, support_number, bump_enabled, bump_title, bump_description, bump_price, bump_image_url, bump_button_text, bump_highlight_color";
+  "id, user_id, name, description, price, image_url, checkout_banner_url, category, status, custom_url, warranty_days, delivery_type, facebook_pixel_id, bump_enabled, bump_title, bump_description, bump_price, bump_image_url, bump_button_text, bump_highlight_color";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -12,11 +10,9 @@ const UUID_RE =
 export const getPublicProduct = createServerFn({ method: "GET" })
   .inputValidator((data) => z.object({ productId: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
-    const url = process.env.SUPABASE_URL!;
-    const key = process.env.SUPABASE_PUBLISHABLE_KEY!;
-    const supabase = createClient<Database>(url, key, {
-      auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
-    });
+    // Load admin client inside handler — never at module top-level in a *.functions.ts file.
+    const { supabaseAdmin: supabase } = await import("@/integrations/supabase/client.server");
+
 
     const { productId } = data;
     const isUuid = UUID_RE.test(productId);
