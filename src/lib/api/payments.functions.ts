@@ -78,12 +78,15 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
 
     const statusAfterReconcile = String(saleRow.status ?? "").toLowerCase();
     const pendingAgeMs = saleRow.created_at ? Date.now() - new Date(saleRow.created_at).getTime() : 0;
-    if (statusAfterReconcile === "pending" && pendingAgeMs > 6 * 60_000) {
+    // Auto-expire pendings após 2 min (antes 6 min) para que cancelamentos
+    // de PIN não detectados pelo webhook apareçam rapidamente como falha
+    // terminal no checkout, em vez de ficar girando "processando".
+    if (statusAfterReconcile === "pending" && pendingAgeMs > 2 * 60_000) {
       const { markSaleTerminalFailure } = await import("@/lib/payments/confirmation.server");
       await markSaleTerminalFailure({
         saleId: saleRow.id,
         status: "expired",
-        reason: "Pagamento não confirmado dentro do tempo limite. Tente novamente ou escolha outro método.",
+        reason: "Pagamento não confirmado a tempo. Provável cancelamento ou PIN não inserido.",
         method: saleRow.payment_method ?? null,
       }).catch((e: unknown) => console.error("[checkout] auto-expire pending sale failed", e));
 
@@ -94,6 +97,7 @@ export const getPaymentSuccessData = createServerFn({ method: "GET" })
         .maybeSingle();
       if (!refreshed.error && refreshed.data) saleRow = refreshed.data as CheckoutSaleRow & { products?: unknown };
     }
+
 
     const status = String(saleRow.status ?? "").toLowerCase();
     const isPaid = ["paid", "approved", "success", "completed"].includes(status);
