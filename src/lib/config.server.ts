@@ -48,6 +48,11 @@ function cleanConfigValue(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizePaymentGatewayBaseUrl(value: string) {
+  const baseUrl = cleanConfigValue(value) || "https://payflax.site";
+  return baseUrl.replace(/\/+$/, "").replace(/\/api\/pay$/i, "");
+}
+
 function pickFirstConfigValue(
   rows: Array<{ key: string; value: string | null }>,
   keys: readonly string[],
@@ -86,12 +91,12 @@ export async function getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | 
   const envApiKey = cleanConfigValue(process.env.PAYMENT_API_KEY);
   const envBaseUrl = cleanConfigValue(process.env.PAYMENT_API_BASE_URL);
   if (envApiKey) {
-    return { apiKey: envApiKey, baseUrl: envBaseUrl || "https://payflax.site" };
+    return { apiKey: envApiKey, baseUrl: normalizePaymentGatewayBaseUrl(envBaseUrl) };
   }
 
   const dbConfig = await readPaymentGatewayConfigFromDatabase();
   if (dbConfig.apiKey) {
-    return { apiKey: dbConfig.apiKey, baseUrl: dbConfig.baseUrl || "https://payflax.site" };
+    return { apiKey: dbConfig.apiKey, baseUrl: normalizePaymentGatewayBaseUrl(dbConfig.baseUrl || "") };
   }
 
   return null;
