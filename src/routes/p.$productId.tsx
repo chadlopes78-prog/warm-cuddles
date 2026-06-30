@@ -711,26 +711,43 @@ function CheckoutPage() {
       <Dialog open={failureModalOpen} onOpenChange={setFailureModalOpen}>
         <DialogContent className="max-w-sm rounded-2xl">
           <DialogHeader>
-            <div className="mx-auto h-14 w-14 rounded-full bg-red-50 flex items-center justify-center mb-2">
+            <div className="mx-auto h-14 w-14 rounded-full bg-red-50 flex items-center justify-center mb-2 animate-pulse">
               <XCircle className="h-8 w-8 text-red-600" />
             </div>
             <DialogTitle className="text-center text-lg font-bold text-slate-900">
-              Pagamento não concluído
+              {paymentErrorCode === "timeout"
+                ? "⏰ O PIN não foi confirmado a tempo"
+                : paymentErrorCode === "cancelled"
+                  ? "😕 Quase lá! Pagamento cancelado"
+                  : paymentErrorCode === "insufficient_balance"
+                    ? "💳 Saldo insuficiente"
+                    : "⚠️ A tua compra ainda não foi concluída"}
             </DialogTitle>
-            <DialogDescription className="text-center text-sm text-slate-600 pt-1">
-              Não foi possível concluir o seu pagamento. Tente novamente agora para garantir a sua oferta exclusiva antes que expire.
+            <DialogDescription className="text-center text-sm text-slate-600 pt-1 space-y-2">
+              <span className="block">
+                {paymentErrorCode === "timeout"
+                  ? "Não conseguimos confirmar o teu PIN a tempo. Isto acontece — tenta de novo e digita o PIN assim que receberes a notificação da operadora."
+                  : paymentErrorCode === "cancelled"
+                    ? "Cancelaste o pedido por engano? Não percas esta oferta — clica abaixo e finaliza em segundos."
+                    : paymentErrorCode === "insufficient_balance"
+                      ? "Recarrega a tua carteira e volta já — a tua oferta ainda está reservada por poucos minutos."
+                      : "Tenta novamente agora para garantir o teu acesso antes que a oferta expire."}
+              </span>
+              <span className="block text-[11px] font-semibold text-red-600">
+                🔥 Esta oferta exclusiva expira em poucos minutos
+              </span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex flex-col gap-2 sm:flex-col">
             <Button
               onClick={retryPayment}
               disabled={processingPayment}
-              className="w-full h-12 rounded-xl font-bold text-white"
+              className="w-full h-12 rounded-xl font-bold text-white shadow-lg"
               style={{
                 background: `linear-gradient(180deg, ${accent} 0%, ${paymentMethod === "mpesa" ? "#B30410" : "#EA580C"} 100%)`,
               }}
             >
-              {processingPayment ? "A enviar..." : "Tentar Novamente"}
+              {processingPayment ? "A enviar..." : "✅ Tentar Novamente Agora"}
             </Button>
             <button
               type="button"
@@ -742,6 +759,7 @@ function CheckoutPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
