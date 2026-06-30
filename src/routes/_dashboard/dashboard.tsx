@@ -9,7 +9,8 @@ import {
   AlertCircle,
   BarChart3,
   AlertTriangle,
-  RefreshCcw
+  RefreshCcw,
+  ArrowUpRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,21 +19,53 @@ import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DateRangePicker, DateRangePreset } from "@/components/dashboard/DateRangePicker";
-import { format, subDays, differenceInDays, startOfDay, endOfDay, parseISO } from "date-fns";
+import {
+  format,
+  subDays,
+  differenceInDays,
+  startOfDay,
+  endOfDay,
+  parseISO,
+  startOfMonth,
+  endOfMonth,
+  startOfYear,
+  endOfYear,
+  startOfWeek,
+  endOfWeek,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { toast } from "sonner";
 
-// Lazy load chart (Recharts ~220KB)
 const PerformanceChart = lazy(() => import("@/components/dashboard/PerformanceChart"));
 
 export const Route = createFileRoute("/_dashboard/dashboard")({
   validateSearch: (search: Record<string, unknown>) => {
-    return {
-      tab: (search.tab as string) || "overview",
-    };
+    return { tab: (search.tab as string) || "overview" };
   },
   component: DashboardPage,
 });
+
+const QUICK_FILTERS: { label: string; preset: DateRangePreset; getRange: () => { from: Date; to: Date } }[] = [
+  {
+    label: "Hoje",
+    preset: "today",
+    getRange: () => ({ from: startOfDay(new Date()), to: endOfDay(new Date()) }),
+  },
+  {
+    label: "Esta semana",
+    preset: "last7days",
+    getRange: () => ({ from: startOfWeek(new Date(), { locale: ptBR }), to: endOfDay(new Date()) }),
+  },
+  {
+    label: "Este mês",
+    preset: "thisMonth",
+    getRange: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }),
+  },
+  {
+    label: "Este ano",
+    preset: "thisYear",
+    getRange: () => ({ from: startOfYear(new Date()), to: endOfYear(new Date()) }),
+  },
+];
 
 function DashboardPage() {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
@@ -41,41 +74,29 @@ function DashboardPage() {
       try {
         const { from, to } = JSON.parse(saved);
         return { from: new Date(from), to: new Date(to) };
-      } catch (e) {
-        console.error("Error parsing saved date range", e);
-      }
+      } catch { /* ignore */ }
     }
-    return {
-      from: startOfDay(subDays(new Date(), 6)),
-      to: endOfDay(new Date()),
-    };
-  });
-  
-  const [preset, setPreset] = useState<DateRangePreset>(() => {
-    return (sessionStorage.getItem("dashboard-preset") as DateRangePreset) || "last7days";
+    return { from: startOfDay(subDays(new Date(), 6)), to: endOfDay(new Date()) };
   });
 
+  const [preset, setPreset] = useState<DateRangePreset>(
+    () => (sessionStorage.getItem("dashboard-preset") as DateRangePreset) || "last7days"
+  );
 
   const queryClient = useQueryClient();
 
   const { data: dashboardData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["dashboard-metrics", dateRange.from.toISOString(), dateRange.to.toISOString()],
     queryFn: async () => {
-      console.log("[Dashboard] Fetching metrics for range:", dateRange.from.toISOString(), "to", dateRange.to.toISOString());
-      
-      const { data, error } = await supabase.rpc('get_dashboard_metrics', {
+      const { data, error } = await supabase.rpc("get_dashboard_metrics", {
         p_start_date: dateRange.from.toISOString(),
-        p_end_date: dateRange.to.toISOString()
+        p_end_date: dateRange.to.toISOString(),
       });
 
       if (error) {
-        console.error("[Dashboard] RPC Error details:", error);
-        
-        // Fallback for non-RPC data if it fails
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw error;
 
-        console.log("[Dashboard] Falling back to direct query due to RPC error");
         const { data: sales, error: salesError } = await supabase
           .from("sales")
           .select("amount, status, created_at, products(name)")
@@ -94,12 +115,8 @@ function DashboardPage() {
           lost_value: sales.filter(s => s.status && ["failed", "error", "cancelled", "canceled"].includes(s.status)).reduce((acc, s) => acc + Number(s.amount), 0),
         };
 
-        const recentSales = sales.slice(0, 10).map(s => ({
-          ...s,
-          product_name: (s.products as any)?.name
-        }));
+        const recentSales = sales.slice(0, 10).map(s => ({ ...s, product_name: (s.products as any)?.name }));
 
-        // Group by day for chart
         const dailyMap = new Map();
         sales.forEach(s => {
           if (!s.created_at) return;
@@ -110,46 +127,21 @@ function DashboardPage() {
           dailyMap.set(day, current);
         });
 
-        const chartData = Array.from(dailyMap.entries()).map(([day, val]) => ({
-          day,
-          ...val
-        }));
-
-        return {
-          stats,
-          chartData,
-          recentSales
-        };
+        return { stats, chartData: Array.from(dailyMap.entries()).map(([day, val]) => ({ day, ...val })), recentSales };
       }
 
-      console.log("[Dashboard] RPC Data received:", data);
-
       const result = data as any;
-      
-      // Process chart data to ensure labels are formatted and empty days are handled
       const rawChartData = result.chartData || [];
-      const stats = result.stats || {
-        total_transactions: 0,
-        success_count: 0,
-        failed_count: 0,
-        total_value: 0,
-        received_value: 0,
-        lost_value: 0
-      };
+      const stats = result.stats || { total_transactions: 0, success_count: 0, failed_count: 0, total_value: 0, received_value: 0, lost_value: 0 };
       const recentSales = result.recentSales || [];
 
       const days = differenceInDays(dateRange.to, dateRange.from) + 1;
       const formattedChartData = [];
-      
       for (let i = 0; i < days; i++) {
         const dayDate = startOfDay(subDays(dateRange.to, days - 1 - i));
         const dayStr = format(dayDate, "yyyy-MM-dd");
         const dayLabel = format(dayDate, "dd/MM", { locale: ptBR });
-        
-        const existingDay = rawChartData.find((d: any) => 
-          d.day && format(parseISO(d.day), "yyyy-MM-dd") === dayStr
-        );
-
+        const existingDay = rawChartData.find((d: any) => d.day && format(parseISO(d.day), "yyyy-MM-dd") === dayStr);
         formattedChartData.push({
           name: dayLabel,
           sucesso: existingDay ? Number(existingDay.sucesso || 0) : 0,
@@ -157,16 +149,11 @@ function DashboardPage() {
         });
       }
 
-      return {
-        stats,
-        chartData: formattedChartData,
-        recentSales
-      };
+      return { stats, chartData: formattedChartData, recentSales };
     },
-    staleTime: 1000 * 10, // 10 seconds for more "realtime" feel
+    staleTime: 1000 * 10,
     retry: 1,
   });
-
 
   const handleRangeChange = (range: { from: Date; to: Date }, newPreset: DateRangePreset) => {
     setDateRange(range);
@@ -175,7 +162,11 @@ function DashboardPage() {
     sessionStorage.setItem("dashboard-preset", newPreset);
   };
 
-  // Realtime: refresh dashboard the moment a sale is inserted/updated (e.g. status -> paid)
+  const handleQuickFilter = (filter: typeof QUICK_FILTERS[number]) => {
+    const range = filter.getRange();
+    handleRangeChange(range, filter.preset);
+  };
+
   useEffect(() => {
     let cancelled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -184,13 +175,9 @@ function DashboardPage() {
       if (cancelled || !session?.user?.id) return;
       channel = supabase
         .channel(`dashboard-sales-${session.user.id}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "sales", filter: `user_id=eq.${session.user.id}` },
-          () => {
-            queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
-          }
-        )
+        .on("postgres_changes", { event: "*", schema: "public", table: "sales", filter: `user_id=eq.${session.user.id}` }, () => {
+          queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
+        })
         .subscribe();
     })();
     return () => {
@@ -198,8 +185,6 @@ function DashboardPage() {
       if (channel) supabase.removeChannel(channel);
     };
   }, [queryClient]);
-
-
 
   const { heroKpis, metricCards } = useMemo(() => {
     if (!dashboardData) return { heroKpis: [], metricCards: [] };
@@ -217,247 +202,223 @@ function DashboardPage() {
     const fmtMT = (v: number) =>
       `${Number(v).toLocaleString("pt-MZ", { maximumFractionDigits: 0 })} MT`;
 
-    const heroKpis = [
-      {
-        title: "Valor Recebido (líquido)",
-        value: fmtMT(received),
-        description: `Bruto ${fmtMT(receivedGross)} − taxa ${fmtMT(gatewayFee)}`,
-        icon: CreditCard,
-        accent: "bg-emerald-500",
-        tone: "text-emerald-600",
-      },
-      {
-        title: "Taxa de Conversão",
-        value: `${conversionRate.toFixed(1)}%`,
-        description: `${success} de ${total} tentativas`,
-        icon: TrendingUp,
-        accent: "bg-blue-600",
-        tone: "text-blue-600",
-      },
-      {
-        title: "Ticket Médio (líquido)",
-        value: fmtMT(avgTicket),
-        description: "Por venda aprovada, após taxa",
-        icon: DollarSign,
-        accent: "bg-slate-900",
-        tone: "text-slate-900",
-      },
-    ];
-
-    const metricCards = [
-      {
-        title: "Total de Transações",
-        value: stats.total_transactions,
-        description: "Volume total de pedidos",
-        icon: ShoppingCart,
-        color: "bg-slate-900",
-      },
-      {
-        title: "Vendas com Sucesso",
-        value: stats.success_count,
-        description: "Pagamentos confirmados",
-        icon: TrendingUp,
-        color: "bg-emerald-500",
-      },
-      {
-        title: "Vendas com Falha",
-        value: stats.failed_count,
-        description: "Pagamentos não concluídos",
-        icon: TrendingDown,
-        color: "bg-rose-500",
-      },
-      {
-        title: "Valor Total",
-        value: fmtMT(Number(stats.total_value)),
-        description: "Soma de todas as tentativas",
-        icon: DollarSign,
-        color: "bg-blue-600",
-      },
-      {
-        title: "Valor Perdido",
-        value: fmtMT(Number(stats.lost_value)),
-        description: "Oportunidades perdidas",
-        icon: AlertCircle,
-        color: "bg-rose-600",
-      },
-    ];
-
-    return { heroKpis, metricCards };
+    return {
+      heroKpis: [
+        {
+          title: "Receita Líquida",
+          value: fmtMT(received),
+          sub: `Bruto ${fmtMT(receivedGross)} − taxa ${fmtMT(gatewayFee)}`,
+          icon: DollarSign,
+          color: "emerald",
+        },
+        {
+          title: "Taxa de Conversão",
+          value: `${conversionRate.toFixed(1)}%`,
+          sub: `${success} aprovadas de ${total} tentativas`,
+          icon: TrendingUp,
+          color: "blue",
+        },
+        {
+          title: "Ticket Médio",
+          value: fmtMT(avgTicket),
+          sub: "Por venda aprovada, após taxa",
+          icon: ArrowUpRight,
+          color: "violet",
+        },
+      ],
+      metricCards: [
+        { label: "Transações", value: String(stats.total_transactions), icon: ShoppingCart, color: "slate" },
+        { label: "Aprovadas", value: String(stats.success_count), icon: TrendingUp, color: "emerald" },
+        { label: "Falhas", value: String(stats.failed_count), icon: TrendingDown, color: "rose" },
+        { label: "Volume total", value: fmtMT(Number(stats.total_value)), icon: CreditCard, color: "blue" },
+        { label: "Perdido", value: fmtMT(Number(stats.lost_value)), icon: AlertCircle, color: "rose" },
+      ],
+    };
   }, [dashboardData]);
 
-  if (isLoading) return (
-    <div className="space-y-6 pb-12 max-w-[1400px] mx-auto px-4 md:px-0 animate-in fade-in duration-300">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-48 rounded-xl" />
-          <Skeleton className="h-3 w-64 rounded-md" />
+  const colorMap: Record<string, { border: string; icon: string; badge: string; text: string }> = {
+    emerald: { border: "border-emerald-500", icon: "bg-emerald-50 text-emerald-600", badge: "bg-emerald-500", text: "text-emerald-600" },
+    blue: { border: "border-blue-500", icon: "bg-blue-50 text-blue-600", badge: "bg-blue-500", text: "text-blue-600" },
+    violet: { border: "border-violet-500", icon: "bg-violet-50 text-violet-600", badge: "bg-violet-500", text: "text-violet-600" },
+    rose: { border: "border-rose-500", icon: "bg-rose-50 text-rose-600", badge: "bg-rose-500", text: "text-rose-600" },
+    slate: { border: "border-slate-700", icon: "bg-slate-100 text-slate-700", badge: "bg-slate-700", text: "text-slate-700" },
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 pb-12 max-w-[1400px] mx-auto animate-in fade-in duration-300">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-border">
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-9 w-72" />
         </div>
-        <Skeleton className="h-10 w-64 rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[0, 1, 2].map(i => <Skeleton key={i} className="h-36 rounded-2xl" />)}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {[0, 1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-[380px] rounded-2xl" />
+        <Skeleton className="h-72 rounded-2xl" />
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-32 rounded-3xl" />
-        ))}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-24 rounded-2xl" />
-        ))}
-      </div>
-      <Skeleton className="h-[420px] rounded-3xl" />
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Skeleton className="h-72 rounded-3xl" />
-        <Skeleton className="h-72 rounded-3xl" />
-      </div>
-    </div>
-  );
+    );
+  }
 
-
-  if (!dashboardData) return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-      <AlertTriangle className="h-12 w-12 text-rose-500" />
-      <p className="font-black text-slate-900 uppercase tracking-widest text-xs">Erro ao carregar dados. Tente atualizar a página.</p>
-      <Button onClick={() => refetch()} variant="outline" size="sm" className="rounded-xl font-black uppercase tracking-tighter">
-        <RefreshCcw className="mr-2 h-4 w-4" /> Tentar Novamente
-      </Button>
-    </div>
-  );
+  if (!dashboardData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <AlertTriangle className="h-10 w-10 text-rose-400" />
+        <p className="text-sm font-semibold text-muted-foreground">Erro ao carregar dados.</p>
+        <Button onClick={() => refetch()} variant="outline" size="sm">
+          <RefreshCcw className="mr-2 h-4 w-4" /> Tentar novamente
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-12 max-w-[1400px] mx-auto px-4 md:px-0">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6">
-        <div>
+    <div className="space-y-6 pb-12 max-w-[1400px] mx-auto animate-in fade-in duration-300">
+      {/* Header */}
+      <div className="flex flex-col gap-4 pb-6 border-b border-border">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">Dashboard</h1>
-            {isFetching && <RefreshCcw className="h-4 w-4 animate-spin text-slate-400" />}
+            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            {isFetching && <RefreshCcw className="h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
-          <p className="text-sm text-muted-foreground font-medium uppercase tracking-tighter">Visão geral sincronizada com seu Checkout.</p>
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-2">
           <DateRangePicker onRangeChange={handleRangeChange} initialPreset={preset} initialRange={dateRange} />
-          
+        </div>
+
+        {/* Quick filter tabs */}
+        <div className="flex flex-wrap gap-2">
+          {QUICK_FILTERS.map(filter => {
+            const active = preset === filter.preset;
+            return (
+              <button
+                key={filter.preset}
+                onClick={() => handleQuickFilter(filter)}
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-sm font-medium transition-all",
+                  active
+                    ? "bg-foreground text-background shadow-sm"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                )}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
+      {/* Hero KPI cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {heroKpis.map((kpi) => (
-          <Card
-            key={kpi.title}
-            className="relative border-none shadow-lg bg-white overflow-hidden rounded-3xl transition-all hover:shadow-2xl hover:-translate-y-0.5"
-          >
-            <div className={cn("absolute inset-x-0 top-0 h-1.5", kpi.accent)} />
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  {kpi.title}
-                </span>
-                <div className={cn("p-2 rounded-xl bg-slate-50", kpi.tone)}>
-                  <kpi.icon className="h-4 w-4" />
+        {heroKpis.map(kpi => {
+          const c = colorMap[kpi.color];
+          return (
+            <Card key={kpi.title} className={cn("border-l-4 shadow-sm rounded-2xl", c.border)}>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{kpi.title}</p>
+                  <div className={cn("p-2 rounded-lg", c.icon)}>
+                    <kpi.icon className="h-4 w-4" />
+                  </div>
                 </div>
-              </div>
-              <div className={cn("mt-4 text-4xl md:text-5xl font-black tracking-tighter", kpi.tone)}>
-                {kpi.value}
-              </div>
-              <p className="text-[10px] text-slate-500 font-bold mt-2 uppercase tracking-tighter">
-                {kpi.description}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+                <p className={cn("text-3xl font-bold tracking-tight", c.text)}>{kpi.value}</p>
+                <p className="text-xs text-muted-foreground mt-1">{kpi.sub}</p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
+      {/* Secondary metric cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {metricCards.map((metric) => (
-          <Card key={metric.title} className="border-none shadow-sm bg-white overflow-hidden rounded-2xl transition-all hover:shadow-md hover:-translate-y-0.5 group">
-            <div className={cn("h-0.5 w-full transition-all group-hover:h-1", metric.color)} />
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-3 px-4">
-              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 leading-tight">{metric.title}</span>
-              <metric.icon className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-900 transition-colors shrink-0" />
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-xl font-black text-slate-900 tracking-tighter truncate">{metric.value}</div>
-              <p className="text-[9px] text-slate-500 font-bold mt-1 uppercase tracking-tighter line-clamp-1">{metric.description}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {metricCards.map(m => {
+          const c = colorMap[m.color];
+          return (
+            <Card key={m.label} className="shadow-sm rounded-xl">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground">{m.label}</p>
+                  <div className={cn("p-1.5 rounded-md", c.icon)}>
+                    <m.icon className="h-3.5 w-3.5" />
+                  </div>
+                </div>
+                <p className="text-xl font-bold text-foreground truncate">{m.value}</p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
+      {/* Performance chart */}
+      <Card className="shadow-sm rounded-2xl">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold">Performance de Vendas</CardTitle>
+          </div>
+          <CardDescription className="text-xs">Aprovadas vs. falhas no período selecionado</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <Suspense fallback={<div className="h-[340px] w-full rounded-xl bg-muted animate-pulse" />}>
+            <PerformanceChart data={dashboardData.chartData} />
+          </Suspense>
+        </CardContent>
+      </Card>
 
-      <div className="grid grid-cols-1 gap-6">
-        <Card className="border-none shadow-xl bg-white p-6 rounded-3xl">
-          <CardHeader className="px-0 pt-0">
-            <CardTitle className="text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" /> Gráfico de Performance
-            </CardTitle>
-            <CardDescription className="text-[10px] font-bold uppercase text-slate-400">Conversão diária de vendas (Sucesso vs Falha)</CardDescription>
-          </CardHeader>
-          <CardContent className="px-0 pb-0 pt-8">
-            <Suspense fallback={<div className="h-[350px] w-full rounded-2xl bg-slate-50 animate-pulse" />}>
-              <PerformanceChart data={dashboardData.chartData} />
-            </Suspense>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
-        <Card className="border-none shadow-xl bg-white rounded-3xl overflow-hidden ring-1 ring-slate-100 flex flex-col">
-          <CardHeader className="bg-slate-50/50 border-b pb-4">
-            <div>
-              <CardTitle className="text-lg font-black uppercase tracking-tighter flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-primary" /> Atividade Recente
-              </CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase text-slate-400">
-                Últimas transações do seu checkout.
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0 flex-1 overflow-auto max-h-[400px]">
-            {dashboardData?.recentSales && dashboardData.recentSales.length > 0 ? (
-              <div className="divide-y divide-slate-50">
-                {dashboardData.recentSales.map((sale: any) => (
-                  <div key={sale.id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
+      {/* Recent activity */}
+      <Card className="shadow-sm rounded-2xl overflow-hidden">
+        <CardHeader className="border-b">
+          <CardTitle className="text-sm font-semibold">Atividade Recente</CardTitle>
+          <CardDescription className="text-xs">Últimas transações do seu checkout</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {dashboardData.recentSales && dashboardData.recentSales.length > 0 ? (
+            <div className="divide-y divide-border">
+              {dashboardData.recentSales.map((sale: any) => {
+                const isSuccess = ["paid", "approved", "success"].includes(sale.status);
+                const isFail = ["failed", "error"].includes(sale.status);
+                return (
+                  <div key={sale.id} className="flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className={cn(
-                        "h-10 w-10 rounded-xl flex items-center justify-center shadow-sm",
-                        ["paid", "approved", "success"].includes(sale.status) ? "bg-emerald-100 text-emerald-600" :
-                        ["failed", "error"].includes(sale.status) ? "bg-slate-100 text-slate-600" : "bg-blue-100 text-blue-600"
+                        "h-9 w-9 rounded-full flex items-center justify-center",
+                        isSuccess ? "bg-emerald-100 text-emerald-600" : isFail ? "bg-rose-100 text-rose-500" : "bg-blue-100 text-blue-600"
                       )}>
-                        {["paid", "approved", "success"].includes(sale.status) ? <TrendingUp className="h-5 w-5" /> :
-                         ["failed", "error"].includes(sale.status) ? <TrendingDown className="h-5 w-5" /> : <CreditCard className="h-5 w-5" />}
+                        {isSuccess ? <TrendingUp className="h-4 w-4" /> : isFail ? <TrendingDown className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
                       </div>
                       <div>
-                        <p className="text-xs font-black text-slate-900 uppercase tracking-tighter">
-                          {["paid", "approved", "success"].includes(sale.status) ? "Venda Aprovada" :
-                           ["failed", "error"].includes(sale.status) ? "Pagamento Falhou" : "Novo Pedido"}
+                        <p className="text-sm font-medium text-foreground leading-tight">
+                          {sale.product_name || "Produto"}
                         </p>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase truncate max-w-[200px]">
-                          {sale.product_name || "Produto"} • {sale.customer_name || "Cliente"}
+                        <p className="text-xs text-muted-foreground">
+                          {sale.customer_name || "—"} · {format(parseISO(sale.created_at), "dd/MM HH:mm", { locale: ptBR })}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs font-black text-slate-900">
+                    <div className="flex items-center gap-3">
+                      <span className={cn(
+                        "hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
+                        isSuccess ? "bg-emerald-100 text-emerald-700" : isFail ? "bg-rose-100 text-rose-600" : "bg-blue-100 text-blue-700"
+                      )}>
+                        {isSuccess ? "Aprovado" : isFail ? "Falhou" : "Pendente"}
+                      </span>
+                      <p className="text-sm font-bold text-foreground tabular-nums">
                         {Number(sale.amount).toLocaleString("pt-MZ")} MT
-                      </p>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase">
-                        {format(parseISO(sale.created_at), "HH:mm", { locale: ptBR })}
                       </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                <div className="h-12 w-12 bg-slate-50 rounded-2xl flex items-center justify-center mb-3">
-                  <ShoppingCart className="h-6 w-6 text-slate-300" />
-                </div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Nenhuma atividade recente</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <ShoppingCart className="h-8 w-8 text-muted-foreground/30 mb-3" />
+              <p className="text-sm text-muted-foreground">Nenhuma transação no período</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
