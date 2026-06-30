@@ -28,13 +28,21 @@ export const Route = createFileRoute("/api/public/hooks/reconcile-pending-paymen
     handlers: {
       POST: async ({ request }) => {
         const provided =
-          request.headers.get("x-cron-secret") ??
           request.headers.get("apikey") ??
           request.headers.get("x-api-key") ??
+          request.headers.get("x-cron-secret") ??
           request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
           null;
-        const expected = process.env.CRON_SECRET;
-        if (!expected || !provided || provided !== expected) {
+        // Canonical pg_cron auth = Supabase anon/publishable key in `apikey`.
+        // CRON_SECRET kept as optional fallback for legacy callers.
+        const accepted = new Set(
+          [
+            process.env.SUPABASE_PUBLISHABLE_KEY,
+            process.env.SUPABASE_ANON_KEY,
+            process.env.CRON_SECRET,
+          ].filter((v): v is string => Boolean(v)),
+        );
+        if (!provided || !accepted.has(provided)) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
