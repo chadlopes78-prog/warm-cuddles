@@ -47,6 +47,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { getGatewayConfig, saveGatewayConfig } from "@/lib/api/admin.functions";
 import { cn } from "@/lib/utils";
 import { isAdminEmail, ADMIN_EMAILS } from "@/lib/admins";
 
@@ -479,15 +480,11 @@ function GatewayCredentialsCard() {
 
   const load = useCallback(async () => {
     try {
-      const { data } = await supabase
-        .from("app_config")
-        .select("key,value")
-        .in("key", ["e2payment_client_id", "e2payment_client_secret", "e2payment_wallet_mpesa", "e2payment_wallet_emola"]);
-      const map = new Map((data ?? []).map((r: any) => [r.key, r.value ?? ""]));
-      setClientId(map.get("e2payment_client_id") ?? "");
-      setClientSecret(map.get("e2payment_client_secret") ?? "");
-      setWalletMpesa(map.get("e2payment_wallet_mpesa") ?? "");
-      setWalletEmola(map.get("e2payment_wallet_emola") ?? "");
+      const cfg = await getGatewayConfig();
+      setClientId(cfg.clientId);
+      setClientSecret(cfg.clientSecret);
+      setWalletMpesa(cfg.walletMpesa);
+      setWalletEmola(cfg.walletEmola);
     } catch (e) {
       console.error("load gateway config error", e);
     } finally {
@@ -497,28 +494,10 @@ function GatewayCredentialsCard() {
 
   useEffect(() => { load(); }, [load]);
 
-  const saveKey = async (key: string, value: string) => {
-    const val = value.trim();
-    const { error: updateErr } = await supabase
-      .from("app_config")
-      .update({ value: val, updated_at: new Date().toISOString() })
-      .eq("key", key);
-    if (updateErr) {
-      // Row may not exist yet, try insert
-      const { error: insertErr } = await supabase
-        .from("app_config")
-        .insert({ key, value: val });
-      if (insertErr) throw new Error(`[${key}] ${insertErr.message}`);
-    }
-  };
-
   const save = async () => {
     setSaving(true);
     try {
-      await saveKey("e2payment_client_id", clientId);
-      await saveKey("e2payment_client_secret", clientSecret);
-      await saveKey("e2payment_wallet_mpesa", walletMpesa);
-      await saveKey("e2payment_wallet_emola", walletEmola);
+      await saveGatewayConfig({ data: { clientId, clientSecret, walletMpesa, walletEmola } });
       toast.success("Credenciais E2Payments salvas com sucesso!");
     } catch (e: any) {
       const msg = e?.message || e?.details || JSON.stringify(e) || "Erro desconhecido";
