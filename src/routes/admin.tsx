@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Users, 
@@ -19,7 +19,11 @@ import {
   Mail,
   Filter,
   AlertTriangle,
-  RefreshCcw
+  RefreshCcw,
+  CreditCard,
+  Eye,
+  EyeOff,
+  Save
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -457,7 +461,139 @@ function AdminControlCenter() {
             </div>
           </div>
         </Card>
+
+        <GatewayCredentialsCard />
       </div>
     </div>
+  );
+}
+
+function GatewayCredentialsCard() {
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [walletMpesa, setWalletMpesa] = useState("");
+  const [walletEmola, setWalletEmola] = useState("");
+  const [showSecret, setShowSecret] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const load = useCallback(async () => {
+    const { data } = await supabase
+      .from("app_config")
+      .select("key,value")
+      .in("key", ["e2payment_client_id", "e2payment_client_secret", "e2payment_wallet_mpesa", "e2payment_wallet_emola"]);
+
+    const map = new Map((data ?? []).map((r: { key: string; value: string | null }) => [r.key, r.value ?? ""]));
+    setClientId(map.get("e2payment_client_id") ?? "");
+    setClientSecret(map.get("e2payment_client_secret") ?? "");
+    setWalletMpesa(map.get("e2payment_wallet_mpesa") ?? "");
+    setWalletEmola(map.get("e2payment_wallet_emola") ?? "");
+    setLoaded(true);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const rows = [
+        { key: "e2payment_client_id", value: clientId.trim() },
+        { key: "e2payment_client_secret", value: clientSecret.trim() },
+        { key: "e2payment_wallet_mpesa", value: walletMpesa.trim() },
+        { key: "e2payment_wallet_emola", value: walletEmola.trim() },
+      ];
+      const { error } = await supabase
+        .from("app_config")
+        .upsert(rows, { onConflict: "key" });
+      if (error) throw error;
+      toast.success("Credenciais E2Payments salvas com sucesso!");
+    } catch (e: any) {
+      toast.error("Erro ao salvar: " + (e?.message ?? "Erro desconhecido"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!loaded) return null;
+
+  return (
+    <Card className="border border-slate-100 shadow-sm bg-white rounded-2xl overflow-hidden">
+      <div className="p-6 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-blue-50">
+            <CreditCard className="h-5 w-5 text-blue-600" />
+          </div>
+          <div>
+            <h2 className="text-lg font-black text-slate-900">Gateway E2Payments</h2>
+            <p className="text-sm text-slate-500 font-medium">Configurar credenciais para M-Pesa e e-Mola (e2payments.explicador.co.mz)</p>
+          </div>
+        </div>
+      </div>
+      <div className="p-6 space-y-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-wider text-slate-500">Client ID</label>
+            <Input
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              placeholder="Seu Client ID"
+              className="h-11 rounded-xl font-mono text-sm"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-wider text-slate-500">Client Secret</label>
+            <div className="relative">
+              <Input
+                type={showSecret ? "text" : "password"}
+                value={clientSecret}
+                onChange={(e) => setClientSecret(e.target.value)}
+                placeholder="Seu Client Secret"
+                className="h-11 rounded-xl font-mono text-sm pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret(!showSecret)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-wider text-slate-500">Wallet ID — M-Pesa</label>
+            <Input
+              value={walletMpesa}
+              onChange={(e) => setWalletMpesa(e.target.value)}
+              placeholder="WAL-00123456"
+              className="h-11 rounded-xl font-mono text-sm"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-wider text-slate-500">Wallet ID — e-Mola</label>
+            <Input
+              value={walletEmola}
+              onChange={(e) => setWalletEmola(e.target.value)}
+              placeholder="WAL-00123456"
+              className="h-11 rounded-xl font-mono text-sm"
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-3 pt-2">
+          <Button
+            onClick={save}
+            disabled={saving || !clientId.trim() || !clientSecret.trim()}
+            className="h-11 px-6 rounded-xl font-bold gap-2"
+          >
+            <Save className="h-4 w-4" />
+            {saving ? "Salvando..." : "Salvar Configuração"}
+          </Button>
+          <p className="text-xs text-slate-400">
+            Estas credenciais são armazenadas de forma segura e usadas apenas no servidor.
+          </p>
+        </div>
+      </div>
+    </Card>
   );
 }

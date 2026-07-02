@@ -26,6 +26,7 @@ import { Route as DashboardNotificationsRouteImport } from './routes/_dashboard/
 import { Route as DashboardFilesRouteImport } from './routes/_dashboard/files'
 import { Route as DashboardDashboardRouteImport } from './routes/_dashboard/dashboard'
 import { Route as ApiPublicPaymentWebhookRouteImport } from './routes/api/public/payment-webhook'
+import { Route as ApiPublicE2paymentWebhookRouteImport } from './routes/api/public/e2payment-webhook'
 import { Route as DashboardReportsTrafficRouteImport } from './routes/_dashboard.reports.traffic'
 import { Route as ApiPublicHooksReconcilePendingPaymentsRouteImport } from './routes/api/public/hooks/reconcile-pending-payments'
 import { Route as ApiPublicHooksProcessWebhookQueueRouteImport } from './routes/api/public/hooks/process-webhook-queue'
@@ -115,6 +116,11 @@ const ApiPublicPaymentWebhookRoute = ApiPublicPaymentWebhookRouteImport.update({
   path: '/api/public/payment-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicE2paymentWebhookRoute = ApiPublicE2paymentWebhookRouteImport.update({
+  id: '/api/public/e2payment-webhook',
+  path: '/api/public/e2payment-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardReportsTrafficRoute = DashboardReportsTrafficRouteImport.update({
   id: '/reports/traffic',
   path: '/reports/traffic',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/p/$productId': typeof PProductIdRoute
   '/reports/traffic': typeof DashboardReportsTrafficRoute
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
+  '/api/public/e2payment-webhook': typeof ApiPublicE2paymentWebhookRoute
   '/api/public/hooks/daily-payment-summary': typeof ApiPublicHooksDailyPaymentSummaryRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
   '/api/public/hooks/reconcile-pending-payments': typeof ApiPublicHooksReconcilePendingPaymentsRoute
@@ -179,6 +186,7 @@ export interface FileRoutesByTo {
   '/p/$productId': typeof PProductIdRoute
   '/reports/traffic': typeof DashboardReportsTrafficRoute
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
+  '/api/public/e2payment-webhook': typeof ApiPublicE2paymentWebhookRoute
   '/api/public/hooks/daily-payment-summary': typeof ApiPublicHooksDailyPaymentSummaryRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
   '/api/public/hooks/reconcile-pending-payments': typeof ApiPublicHooksReconcilePendingPaymentsRoute
@@ -203,6 +211,7 @@ export interface FileRoutesById {
   '/p/$productId': typeof PProductIdRoute
   '/_dashboard/reports/traffic': typeof DashboardReportsTrafficRoute
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
+  '/api/public/e2payment-webhook': typeof ApiPublicE2paymentWebhookRoute
   '/api/public/hooks/daily-payment-summary': typeof ApiPublicHooksDailyPaymentSummaryRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
   '/api/public/hooks/reconcile-pending-payments': typeof ApiPublicHooksReconcilePendingPaymentsRoute
@@ -227,6 +236,7 @@ export interface FileRouteTypes {
     | '/p/$productId'
     | '/reports/traffic'
     | '/api/public/payment-webhook'
+    | '/api/public/e2payment-webhook'
     | '/api/public/hooks/daily-payment-summary'
     | '/api/public/hooks/process-webhook-queue'
     | '/api/public/hooks/reconcile-pending-payments'
@@ -249,6 +259,7 @@ export interface FileRouteTypes {
     | '/p/$productId'
     | '/reports/traffic'
     | '/api/public/payment-webhook'
+    | '/api/public/e2payment-webhook'
     | '/api/public/hooks/daily-payment-summary'
     | '/api/public/hooks/process-webhook-queue'
     | '/api/public/hooks/reconcile-pending-payments'
@@ -272,6 +283,7 @@ export interface FileRouteTypes {
     | '/p/$productId'
     | '/_dashboard/reports/traffic'
     | '/api/public/payment-webhook'
+    | '/api/public/e2payment-webhook'
     | '/api/public/hooks/daily-payment-summary'
     | '/api/public/hooks/process-webhook-queue'
     | '/api/public/hooks/reconcile-pending-payments'
@@ -286,6 +298,7 @@ export interface RootRouteChildren {
   WaitingApprovalRoute: typeof WaitingApprovalRoute
   PProductIdRoute: typeof PProductIdRoute
   ApiPublicPaymentWebhookRoute: typeof ApiPublicPaymentWebhookRoute
+  ApiPublicE2paymentWebhookRoute: typeof ApiPublicE2paymentWebhookRoute
   ApiPublicHooksDailyPaymentSummaryRoute: typeof ApiPublicHooksDailyPaymentSummaryRoute
   ApiPublicHooksProcessWebhookQueueRoute: typeof ApiPublicHooksProcessWebhookQueueRoute
   ApiPublicHooksReconcilePendingPaymentsRoute: typeof ApiPublicHooksReconcilePendingPaymentsRoute
@@ -412,6 +425,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPaymentWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/e2payment-webhook': {
+      id: '/api/public/e2payment-webhook'
+      path: '/api/public/e2payment-webhook'
+      fullPath: '/api/public/e2payment-webhook'
+      preLoaderRoute: typeof ApiPublicE2paymentWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_dashboard/reports/traffic': {
       id: '/_dashboard/reports/traffic'
       path: '/reports/traffic'
@@ -482,6 +502,7 @@ const rootRouteChildren: RootRouteChildren = {
   WaitingApprovalRoute: WaitingApprovalRoute,
   PProductIdRoute: PProductIdRoute,
   ApiPublicPaymentWebhookRoute: ApiPublicPaymentWebhookRoute,
+  ApiPublicE2paymentWebhookRoute: ApiPublicE2paymentWebhookRoute,
   ApiPublicHooksDailyPaymentSummaryRoute:
     ApiPublicHooksDailyPaymentSummaryRoute,
   ApiPublicHooksProcessWebhookQueueRoute:
