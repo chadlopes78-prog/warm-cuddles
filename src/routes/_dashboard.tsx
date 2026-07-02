@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { subscribeToPushNotifications } from "@/lib/push-notifications";
+import { checkAndRefreshPushSubscription } from "@/lib/push-notifications";
 import { isAdminEmail } from "@/lib/admins";
 import { ThemeToggle } from "@/components/ThemeProvider";
 
@@ -152,11 +152,10 @@ function DashboardLayout() {
         // Update last login
         await supabase.from("profiles").update({ last_login: new Date().toISOString() }).eq("id", session.user.id);
 
-        // Auto-subscribe/update push notifications
-        // We do this silently on every dashboard layout mount to ensure tokens are fresh
+        // Auto-cleanup stale VAPID subscriptions and refresh token silently
         if ("Notification" in window) {
-          subscribeToPushNotifications(true).catch(err => 
-            console.error("Error silently updating push token:", err)
+          checkAndRefreshPushSubscription().catch(err =>
+            console.error("Error refreshing push subscription:", err)
           );
         }
 
