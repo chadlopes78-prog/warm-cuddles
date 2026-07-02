@@ -1,7 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { getGatewayConfig, saveGatewayConfig } from "@/lib/api/admin.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Users, 
@@ -479,29 +477,39 @@ function GatewayCredentialsCard() {
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const loadConfig = useServerFn(getGatewayConfig);
-  const saveConfig = useServerFn(saveGatewayConfig);
-
   const load = useCallback(async () => {
     try {
-      const cfg = await loadConfig();
-      setClientId(cfg.clientId);
-      setClientSecret(cfg.clientSecret);
-      setWalletMpesa(cfg.walletMpesa);
-      setWalletEmola(cfg.walletEmola);
+      const { data } = await supabase
+        .from("app_config")
+        .select("key,value")
+        .in("key", ["e2payment_client_id", "e2payment_client_secret", "e2payment_wallet_mpesa", "e2payment_wallet_emola"]);
+      const map = new Map((data ?? []).map((r: any) => [r.key, r.value ?? ""]));
+      setClientId(map.get("e2payment_client_id") ?? "");
+      setClientSecret(map.get("e2payment_client_secret") ?? "");
+      setWalletMpesa(map.get("e2payment_wallet_mpesa") ?? "");
+      setWalletEmola(map.get("e2payment_wallet_emola") ?? "");
     } catch (e) {
       console.error("load gateway config error", e);
     } finally {
       setLoaded(true);
     }
-  }, [loadConfig]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
     setSaving(true);
     try {
-      await saveConfig({ data: { clientId, clientSecret, walletMpesa, walletEmola } });
+      const rows = [
+        { key: "e2payment_client_id", value: clientId.trim() || "" },
+        { key: "e2payment_client_secret", value: clientSecret.trim() || "" },
+        { key: "e2payment_wallet_mpesa", value: walletMpesa.trim() || "" },
+        { key: "e2payment_wallet_emola", value: walletEmola.trim() || "" },
+      ];
+      const { error } = await supabase
+        .from("app_config")
+        .upsert(rows, { onConflict: "key" });
+      if (error) throw error;
       toast.success("Credenciais E2Payments salvas com sucesso!");
     } catch (e: any) {
       toast.error("Erro ao salvar: " + (e?.message ?? "Erro desconhecido"));
