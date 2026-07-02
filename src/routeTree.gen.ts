@@ -22,6 +22,7 @@ import { Route as DashboardRecoveryRouteImport } from './routes/_dashboard/recov
 import { Route as DashboardProductsRouteImport } from './routes/_dashboard/products'
 import { Route as DashboardPixelRouteImport } from './routes/_dashboard/pixel'
 import { Route as DashboardPaymentSummaryRouteImport } from './routes/_dashboard/payment-summary'
+import { Route as DashboardNotificationsRouteImport } from './routes/_dashboard/notifications'
 import { Route as DashboardFilesRouteImport } from './routes/_dashboard/files'
 import { Route as DashboardDashboardRouteImport } from './routes/_dashboard/dashboard'
 import { Route as ApiPublicPaymentWebhookRouteImport } from './routes/api/public/payment-webhook'
@@ -94,6 +95,11 @@ const DashboardPaymentSummaryRoute = DashboardPaymentSummaryRouteImport.update({
   path: '/payment-summary',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardNotificationsRoute = DashboardNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardFilesRoute = DashboardFilesRouteImport.update({
   id: '/files',
   path: '/files',
@@ -141,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/waiting-approval': typeof WaitingApprovalRoute
   '/dashboard': typeof DashboardDashboardRoute
   '/files': typeof DashboardFilesRoute
+  '/notifications': typeof DashboardNotificationsRoute
   '/payment-summary': typeof DashboardPaymentSummaryRoute
   '/pixel': typeof DashboardPixelRoute
   '/products': typeof DashboardProductsRoute
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/waiting-approval': typeof WaitingApprovalRoute
   '/dashboard': typeof DashboardDashboardRoute
   '/files': typeof DashboardFilesRoute
+  '/notifications': typeof DashboardNotificationsRoute
   '/payment-summary': typeof DashboardPaymentSummaryRoute
   '/pixel': typeof DashboardPixelRoute
   '/products': typeof DashboardProductsRoute
@@ -185,6 +193,7 @@ export interface FileRoutesById {
   '/waiting-approval': typeof WaitingApprovalRoute
   '/_dashboard/dashboard': typeof DashboardDashboardRoute
   '/_dashboard/files': typeof DashboardFilesRoute
+  '/_dashboard/notifications': typeof DashboardNotificationsRoute
   '/_dashboard/payment-summary': typeof DashboardPaymentSummaryRoute
   '/_dashboard/pixel': typeof DashboardPixelRoute
   '/_dashboard/products': typeof DashboardProductsRoute
@@ -208,6 +217,7 @@ export interface FileRouteTypes {
     | '/waiting-approval'
     | '/dashboard'
     | '/files'
+    | '/notifications'
     | '/payment-summary'
     | '/pixel'
     | '/products'
@@ -229,6 +239,7 @@ export interface FileRouteTypes {
     | '/waiting-approval'
     | '/dashboard'
     | '/files'
+    | '/notifications'
     | '/payment-summary'
     | '/pixel'
     | '/products'
@@ -251,6 +262,7 @@ export interface FileRouteTypes {
     | '/waiting-approval'
     | '/_dashboard/dashboard'
     | '/_dashboard/files'
+    | '/_dashboard/notifications'
     | '/_dashboard/payment-summary'
     | '/_dashboard/pixel'
     | '/_dashboard/products'
@@ -372,6 +384,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardPaymentSummaryRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/notifications': {
+      id: '/_dashboard/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof DashboardNotificationsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/files': {
       id: '/_dashboard/files'
       path: '/files'
@@ -427,6 +446,7 @@ declare module '@tanstack/react-router' {
 interface DashboardRouteChildren {
   DashboardDashboardRoute: typeof DashboardDashboardRoute
   DashboardFilesRoute: typeof DashboardFilesRoute
+  DashboardNotificationsRoute: typeof DashboardNotificationsRoute
   DashboardPaymentSummaryRoute: typeof DashboardPaymentSummaryRoute
   DashboardPixelRoute: typeof DashboardPixelRoute
   DashboardProductsRoute: typeof DashboardProductsRoute
@@ -439,6 +459,7 @@ interface DashboardRouteChildren {
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardDashboardRoute: DashboardDashboardRoute,
   DashboardFilesRoute: DashboardFilesRoute,
+  DashboardNotificationsRoute: DashboardNotificationsRoute,
   DashboardPaymentSummaryRoute: DashboardPaymentSummaryRoute,
   DashboardPixelRoute: DashboardPixelRoute,
   DashboardProductsRoute: DashboardProductsRoute,

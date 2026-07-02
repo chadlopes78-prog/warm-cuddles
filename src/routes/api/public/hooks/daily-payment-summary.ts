@@ -101,6 +101,19 @@ export const Route = createFileRoute("/api/public/hooks/daily-payment-summary")(
             }
           }
 
+          // Native Web Push — daily summary
+          try {
+            const { sendPushToUser } = await import("@/lib/push/sender.server");
+            const body = `${totalFailures} falha${totalFailures !== 1 ? "s" : ""} — ${totalAmount.toFixed(0)} MZN nas últimas 24h`;
+            await sendPushToUser(userId, {
+              event: "daily_summary",
+              body,
+              url: "/transactions",
+            });
+          } catch (e) {
+            console.error("[daily-summary] push failed", e);
+          }
+
           results.push({ user_id: userId, failures: totalFailures });
         }
 

@@ -569,6 +569,21 @@ export async function markSaleTerminalFailure(options: {
     },
   });
   await processPendingForUser(updated.user_id);
+
+  // Native Web Push — notify user of failed payment
+  try {
+    const { sendPushToUser } = await import("@/lib/push/sender.server");
+    const method = updated.payment_method ?? "pagamento";
+    await sendPushToUser(updated.user_id, {
+      event: "sale.failed",
+      body: `${method} — ${reason?.slice(0, 80) ?? status}`,
+      url: "/transactions",
+      metadata: { saleId: updated.id },
+    });
+  } catch (e) {
+    console.error("[push][sale.failed] error (suppressed)", e);
+  }
+
   return { becameFailed: true };
 }
 
@@ -701,6 +716,21 @@ async function dispatchApprovedSideEffects(
       console.error("[pushcut][profile-fallback] error (suppressed)", e);
     }
   }
+  // Native Web Push notification — always fires regardless of Pushcut config
+  try {
+    const { sendPushToUser } = await import("@/lib/push/sender.server");
+    const amountStr = sale.amount != null ? `${Number(sale.amount).toLocaleString("pt-MZ")} MT` : "";
+    const productName = (sale.products as { name?: string | null } | null)?.name ?? "produto";
+    await sendPushToUser(userId, {
+      event: "sale.approved",
+      body: `${amountStr ? amountStr + " — " : ""}${productName}${sale.customer_name ? " · " + sale.customer_name : ""}`,
+      url: "/transactions",
+      metadata: { saleId: sale.id },
+    });
+  } catch (e) {
+    console.error("[push][sale.approved] error (suppressed)", e);
+  }
+
   // Silence unused warning for helper kept for non-approved flows.
   void enqueueWebhookEvent;
 
