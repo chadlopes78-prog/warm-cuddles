@@ -2,7 +2,7 @@ import webpush from "web-push";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const VAPID_PUBLIC_KEY =
-  "BETEoVdcIuhkKSgg8hOo_FMhcFPODIRW7prsctLKBjrCHHyUX3Vies5BrclXrsifs4H3-lRtJV1uBQ-HiXv4bVc";
+  "BEZBvJVrnVoRB6FbVd6QVwzobDsoSg0LVNyHN7rfPT1PLxAb2BOdSxz1J8A2XrSlgjtio6yNuGfcKJrxtV6qLec";
 
 function getVapidDetails() {
   const privateKey = process.env.VAPID_PRIVATE_KEY;
