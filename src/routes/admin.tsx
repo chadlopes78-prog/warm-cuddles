@@ -47,7 +47,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { getGatewayConfig, saveGatewayConfig } from "@/lib/api/admin.functions";
 import { cn } from "@/lib/utils";
 import { isAdminEmail, ADMIN_EMAILS } from "@/lib/admins";
 
@@ -478,13 +477,23 @@ function GatewayCredentialsCard() {
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
+  const getToken = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? "";
+  };
+
   const load = useCallback(async () => {
     try {
-      const cfg = await getGatewayConfig();
-      setClientId(cfg.clientId);
-      setClientSecret(cfg.clientSecret);
-      setWalletMpesa(cfg.walletMpesa);
-      setWalletEmola(cfg.walletEmola);
+      const token = await getToken();
+      const res = await fetch("/api/admin/gateway-config", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const cfg = await res.json();
+      setClientId(cfg.clientId ?? "");
+      setClientSecret(cfg.clientSecret ?? "");
+      setWalletMpesa(cfg.walletMpesa ?? "");
+      setWalletEmola(cfg.walletEmola ?? "");
     } catch (e) {
       console.error("load gateway config error", e);
     } finally {
@@ -497,10 +506,20 @@ function GatewayCredentialsCard() {
   const save = async () => {
     setSaving(true);
     try {
-      await saveGatewayConfig({ data: { clientId, clientSecret, walletMpesa, walletEmola } });
+      const token = await getToken();
+      const res = await fetch("/api/admin/gateway-config", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ clientId, clientSecret, walletMpesa, walletEmola }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
       toast.success("Credenciais E2Payments salvas com sucesso!");
     } catch (e: any) {
-      const msg = e?.message || e?.details || JSON.stringify(e) || "Erro desconhecido";
+      const msg = e?.message || JSON.stringify(e) || "Erro desconhecido";
       toast.error("Erro ao salvar: " + msg);
     } finally {
       setSaving(false);

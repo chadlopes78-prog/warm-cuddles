@@ -27,6 +27,7 @@ import { Route as DashboardFilesRouteImport } from './routes/_dashboard/files'
 import { Route as DashboardDashboardRouteImport } from './routes/_dashboard/dashboard'
 import { Route as ApiPublicPaymentWebhookRouteImport } from './routes/api/public/payment-webhook'
 import { Route as ApiPublicE2paymentWebhookRouteImport } from './routes/api/public/e2payment-webhook'
+import { Route as ApiAdminGatewayConfigRouteImport } from './routes/api/admin/gateway-config'
 import { Route as DashboardReportsTrafficRouteImport } from './routes/_dashboard.reports.traffic'
 import { Route as ApiPublicHooksReconcilePendingPaymentsRouteImport } from './routes/api/public/hooks/reconcile-pending-payments'
 import { Route as ApiPublicHooksProcessWebhookQueueRouteImport } from './routes/api/public/hooks/process-webhook-queue'
@@ -121,6 +122,11 @@ const ApiPublicE2paymentWebhookRoute = ApiPublicE2paymentWebhookRouteImport.upda
   path: '/api/public/e2payment-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminGatewayConfigRoute = ApiAdminGatewayConfigRouteImport.update({
+  id: '/api/admin/gateway-config',
+  path: '/api/admin/gateway-config',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardReportsTrafficRoute = DashboardReportsTrafficRouteImport.update({
   id: '/reports/traffic',
   path: '/reports/traffic',
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/reports/traffic': typeof DashboardReportsTrafficRoute
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
   '/api/public/e2payment-webhook': typeof ApiPublicE2paymentWebhookRoute
+  '/api/admin/gateway-config': typeof ApiAdminGatewayConfigRoute
   '/api/public/hooks/daily-payment-summary': typeof ApiPublicHooksDailyPaymentSummaryRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
   '/api/public/hooks/reconcile-pending-payments': typeof ApiPublicHooksReconcilePendingPaymentsRoute
@@ -187,6 +194,7 @@ export interface FileRoutesByTo {
   '/reports/traffic': typeof DashboardReportsTrafficRoute
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
   '/api/public/e2payment-webhook': typeof ApiPublicE2paymentWebhookRoute
+  '/api/admin/gateway-config': typeof ApiAdminGatewayConfigRoute
   '/api/public/hooks/daily-payment-summary': typeof ApiPublicHooksDailyPaymentSummaryRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
   '/api/public/hooks/reconcile-pending-payments': typeof ApiPublicHooksReconcilePendingPaymentsRoute
@@ -212,6 +220,7 @@ export interface FileRoutesById {
   '/_dashboard/reports/traffic': typeof DashboardReportsTrafficRoute
   '/api/public/payment-webhook': typeof ApiPublicPaymentWebhookRoute
   '/api/public/e2payment-webhook': typeof ApiPublicE2paymentWebhookRoute
+  '/api/admin/gateway-config': typeof ApiAdminGatewayConfigRoute
   '/api/public/hooks/daily-payment-summary': typeof ApiPublicHooksDailyPaymentSummaryRoute
   '/api/public/hooks/process-webhook-queue': typeof ApiPublicHooksProcessWebhookQueueRoute
   '/api/public/hooks/reconcile-pending-payments': typeof ApiPublicHooksReconcilePendingPaymentsRoute
@@ -299,6 +308,7 @@ export interface RootRouteChildren {
   PProductIdRoute: typeof PProductIdRoute
   ApiPublicPaymentWebhookRoute: typeof ApiPublicPaymentWebhookRoute
   ApiPublicE2paymentWebhookRoute: typeof ApiPublicE2paymentWebhookRoute
+  ApiAdminGatewayConfigRoute: typeof ApiAdminGatewayConfigRoute
   ApiPublicHooksDailyPaymentSummaryRoute: typeof ApiPublicHooksDailyPaymentSummaryRoute
   ApiPublicHooksProcessWebhookQueueRoute: typeof ApiPublicHooksProcessWebhookQueueRoute
   ApiPublicHooksReconcilePendingPaymentsRoute: typeof ApiPublicHooksReconcilePendingPaymentsRoute
@@ -432,6 +442,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicE2paymentWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/gateway-config': {
+      id: '/api/admin/gateway-config'
+      path: '/api/admin/gateway-config'
+      fullPath: '/api/admin/gateway-config'
+      preLoaderRoute: typeof ApiAdminGatewayConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_dashboard/reports/traffic': {
       id: '/_dashboard/reports/traffic'
       path: '/reports/traffic'
@@ -503,6 +520,7 @@ const rootRouteChildren: RootRouteChildren = {
   PProductIdRoute: PProductIdRoute,
   ApiPublicPaymentWebhookRoute: ApiPublicPaymentWebhookRoute,
   ApiPublicE2paymentWebhookRoute: ApiPublicE2paymentWebhookRoute,
+  ApiAdminGatewayConfigRoute: ApiAdminGatewayConfigRoute,
   ApiPublicHooksDailyPaymentSummaryRoute:
     ApiPublicHooksDailyPaymentSummaryRoute,
   ApiPublicHooksProcessWebhookQueueRoute:
