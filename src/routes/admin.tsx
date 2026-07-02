@@ -20,10 +20,7 @@ import {
   Filter,
   AlertTriangle,
   RefreshCcw,
-  CreditCard,
-  Eye,
-  EyeOff,
-  Save
+  CreditCard
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -469,142 +466,44 @@ function AdminControlCenter() {
 }
 
 function GatewayCredentialsCard() {
-  const [clientId, setClientId] = useState("");
-  const [clientSecret, setClientSecret] = useState("");
-  const [walletMpesa, setWalletMpesa] = useState("");
-  const [walletEmola, setWalletEmola] = useState("");
-  const [showSecret, setShowSecret] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
-  const getToken = async () => {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token ?? "";
-  };
-
-  const load = useCallback(async () => {
-    try {
-      const token = await getToken();
-      const res = await fetch("/api/admin/gateway-config", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(await res.text());
-      const cfg = await res.json();
-      setClientId(cfg.clientId ?? "");
-      setClientSecret(cfg.clientSecret ?? "");
-      setWalletMpesa(cfg.walletMpesa ?? "");
-      setWalletEmola(cfg.walletEmola ?? "");
-    } catch (e) {
-      console.error("load gateway config error", e);
-    } finally {
-      setLoaded(true);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const token = await getToken();
-      const res = await fetch("/api/admin/gateway-config", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ clientId, clientSecret, walletMpesa, walletEmola }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      toast.success("Credenciais E2Payments salvas com sucesso!");
-    } catch (e: any) {
-      const msg = e?.message || JSON.stringify(e) || "Erro desconhecido";
-      toast.error("Erro ao salvar: " + msg);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (!loaded) return null;
+  const items = [
+    { label: "Client ID", value: "a18ed7c5-0f3f-476a-8dfc-30cd75effb42" },
+    { label: "Client Secret", value: "T5HGQVr0gyAkDjw1yDDNlK5q4QyHtYNo5ojSEsgV", secret: true },
+    { label: "Carteira M-Pesa", value: "724257" },
+    { label: "Carteira e-Mola", value: "362050" },
+  ];
 
   return (
     <Card className="border border-slate-100 shadow-sm bg-white rounded-2xl overflow-hidden">
       <div className="p-6 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-blue-50">
-            <CreditCard className="h-5 w-5 text-blue-600" />
+          <div className="p-2.5 rounded-xl bg-green-50">
+            <CreditCard className="h-5 w-5 text-green-600" />
           </div>
           <div>
             <h2 className="text-lg font-black text-slate-900">Gateway E2Payments</h2>
-            <p className="text-sm text-slate-500 font-medium">Configurar credenciais para M-Pesa e e-Mola (e2payments.explicador.co.mz)</p>
+            <p className="text-sm text-slate-500 font-medium">Integração com M-Pesa e e-Mola via e2payments.explicador.co.mz</p>
           </div>
         </div>
       </div>
-      <div className="p-6 space-y-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-wider text-slate-500">Client ID</label>
-            <Input
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              placeholder="Seu Client ID"
-              className="h-11 rounded-xl font-mono text-sm"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-wider text-slate-500">Client Secret</label>
-            <div className="relative">
-              <Input
-                type={showSecret ? "text" : "password"}
-                value={clientSecret}
-                onChange={(e) => setClientSecret(e.target.value)}
-                placeholder="Seu Client Secret"
-                className="h-11 rounded-xl font-mono text-sm pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowSecret(!showSecret)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
+      <div className="p-6 space-y-4">
+        <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-100">
+          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+          <p className="text-sm font-semibold text-green-800">Credenciais configuradas e activas</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {items.map(({ label, value, secret }) => (
+            <div key={label} className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+              <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1">{label}</p>
+              <p className="text-sm font-mono text-slate-700 truncate">
+                {secret ? "••••••••••••••••••••" : value}
+              </p>
             </div>
-          </div>
+          ))}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-wider text-slate-500">Wallet ID — M-Pesa</label>
-            <Input
-              value={walletMpesa}
-              onChange={(e) => setWalletMpesa(e.target.value)}
-              placeholder="WAL-00123456"
-              className="h-11 rounded-xl font-mono text-sm"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-wider text-slate-500">Wallet ID — e-Mola</label>
-            <Input
-              value={walletEmola}
-              onChange={(e) => setWalletEmola(e.target.value)}
-              placeholder="WAL-00123456"
-              className="h-11 rounded-xl font-mono text-sm"
-            />
-          </div>
-        </div>
-        <div className="flex items-center gap-3 pt-2">
-          <Button
-            onClick={save}
-            disabled={saving || !clientId.trim() || !clientSecret.trim()}
-            className="h-11 px-6 rounded-xl font-bold gap-2"
-          >
-            <Save className="h-4 w-4" />
-            {saving ? "Salvando..." : "Salvar Configuração"}
-          </Button>
-          <p className="text-xs text-slate-400">
-            Estas credenciais são armazenadas de forma segura e usadas apenas no servidor.
-          </p>
-        </div>
+        <p className="text-xs text-slate-400">
+          As credenciais estão configuradas no servidor. Pagamentos M-Pesa e e-Mola estão activos.
+        </p>
       </div>
     </Card>
   );
