@@ -497,22 +497,32 @@ function GatewayCredentialsCard() {
 
   useEffect(() => { load(); }, [load]);
 
+  const saveKey = async (key: string, value: string) => {
+    const val = value.trim();
+    const { error: updateErr } = await supabase
+      .from("app_config")
+      .update({ value: val, updated_at: new Date().toISOString() })
+      .eq("key", key);
+    if (updateErr) {
+      // Row may not exist yet, try insert
+      const { error: insertErr } = await supabase
+        .from("app_config")
+        .insert({ key, value: val });
+      if (insertErr) throw new Error(`[${key}] ${insertErr.message}`);
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     try {
-      const rows = [
-        { key: "e2payment_client_id", value: clientId.trim() || "" },
-        { key: "e2payment_client_secret", value: clientSecret.trim() || "" },
-        { key: "e2payment_wallet_mpesa", value: walletMpesa.trim() || "" },
-        { key: "e2payment_wallet_emola", value: walletEmola.trim() || "" },
-      ];
-      const { error } = await supabase
-        .from("app_config")
-        .upsert(rows, { onConflict: "key" });
-      if (error) throw error;
+      await saveKey("e2payment_client_id", clientId);
+      await saveKey("e2payment_client_secret", clientSecret);
+      await saveKey("e2payment_wallet_mpesa", walletMpesa);
+      await saveKey("e2payment_wallet_emola", walletEmola);
       toast.success("Credenciais E2Payments salvas com sucesso!");
     } catch (e: any) {
-      toast.error("Erro ao salvar: " + (e?.message ?? "Erro desconhecido"));
+      const msg = e?.message || e?.details || JSON.stringify(e) || "Erro desconhecido";
+      toast.error("Erro ao salvar: " + msg);
     } finally {
       setSaving(false);
     }
