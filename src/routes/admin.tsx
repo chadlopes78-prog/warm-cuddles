@@ -47,6 +47,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { getGatewayConfig, saveGatewayConfig } from "@/lib/api/admin.functions";
 import { cn } from "@/lib/utils";
 import { isAdminEmail, ADMIN_EMAILS } from "@/lib/admins";
 
@@ -479,15 +480,11 @@ function GatewayCredentialsCard() {
 
   const load = useCallback(async () => {
     try {
-      const { data } = await supabase
-        .from("app_config")
-        .select("key,value")
-        .in("key", ["e2payment_client_id", "e2payment_client_secret", "e2payment_wallet_mpesa", "e2payment_wallet_emola"]);
-      const map = new Map((data ?? []).map((r: any) => [r.key, r.value ?? ""]));
-      setClientId(map.get("e2payment_client_id") ?? "");
-      setClientSecret(map.get("e2payment_client_secret") ?? "");
-      setWalletMpesa(map.get("e2payment_wallet_mpesa") ?? "");
-      setWalletEmola(map.get("e2payment_wallet_emola") ?? "");
+      const cfg = await getGatewayConfig();
+      setClientId(cfg.clientId);
+      setClientSecret(cfg.clientSecret);
+      setWalletMpesa(cfg.walletMpesa);
+      setWalletEmola(cfg.walletEmola);
     } catch (e) {
       console.error("load gateway config error", e);
     } finally {
@@ -500,19 +497,11 @@ function GatewayCredentialsCard() {
   const save = async () => {
     setSaving(true);
     try {
-      const rows = [
-        { key: "e2payment_client_id", value: clientId.trim() || "" },
-        { key: "e2payment_client_secret", value: clientSecret.trim() || "" },
-        { key: "e2payment_wallet_mpesa", value: walletMpesa.trim() || "" },
-        { key: "e2payment_wallet_emola", value: walletEmola.trim() || "" },
-      ];
-      const { error } = await supabase
-        .from("app_config")
-        .upsert(rows, { onConflict: "key" });
-      if (error) throw error;
+      await saveGatewayConfig({ data: { clientId, clientSecret, walletMpesa, walletEmola } });
       toast.success("Credenciais E2Payments salvas com sucesso!");
     } catch (e: any) {
-      toast.error("Erro ao salvar: " + (e?.message ?? "Erro desconhecido"));
+      const msg = e?.message || e?.details || JSON.stringify(e) || "Erro desconhecido";
+      toast.error("Erro ao salvar: " + msg);
     } finally {
       setSaving(false);
     }
